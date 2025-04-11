@@ -1,0 +1,14 @@
+[package]
+name = "stock-cli"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = { workspace = true }
+clap = { workspace = true }
+sqlx = { workspace = true }
+stock-application = { path = "../application" }
+stock-domain = { path = "../domain" }
+stock-infrastructure = { path = "../infrastructure" }
+tokio = { workspace = true }
+uuid = { workspace = true }
