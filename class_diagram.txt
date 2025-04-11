@@ -1,0 +1,108 @@
+classDiagram
+    %% Domain Models
+    class Product {
+        +Uuid id
+        +String name
+        +Option~String~ description
+        +String sku
+        +DateTime~Utc~ created_at
+        +DateTime~Utc~ updated_at
+    }
+    
+    class StockItem {
+        +Uuid id
+        +Uuid product_id
+        +i32 quantity
+        +String location
+        +Decimal unit_cost
+        +DateTime~Utc~ last_restocked
+    }
+    
+    class DomainError {
+        <<enumeration>>
+        NotFound(String)
+        InvalidOperation(String)
+        InfrastructureError(String)
+    }
+    
+    %% Repository Interfaces
+    class ProductRepository {
+        <<interface>>
+        +find_by_id(Uuid) DomainResult~Product~
+        +find_all() DomainResult~Vec~Product~~
+        +save(Product) DomainResult~Product~
+        +delete(Uuid) DomainResult~()~
+    }
+    
+    class StockRepository {
+        <<interface>>
+        +find_by_product_id(Uuid) DomainResult~Vec~StockItem~~
+        +update_quantity(Uuid, i32) DomainResult~StockItem~
+        +save(StockItem) DomainResult~StockItem~
+    }
+    
+    %% Repository Implementations
+    class PostgresProductRepository {
+        -PgPool pool
+        +new(PgPool) PostgresProductRepository
+        +find_by_id(Uuid) DomainResult~Product~
+        +find_all() DomainResult~Vec~Product~~
+        +save(Product) DomainResult~Product~
+        +delete(Uuid) DomainResult~()~
+    }
+    
+    class PostgresStockRepository {
+        -PgPool pool
+        +new(PgPool) PostgresStockRepository
+        +find_by_product_id(Uuid) DomainResult~Vec~StockItem~~
+        +update_quantity(Uuid, i32) DomainResult~StockItem~
+        +save(StockItem) DomainResult~StockItem~
+    }
+    
+    %% Application Services
+    class ProductService~P,S~ {
+        -P product_repo
+        -S stock_repo
+        +new(P, S) ProductService
+        +get_product(Uuid) DomainResult~Product~
+        +create_product(Product) DomainResult~Product~
+        +update_stock_quantity(Uuid, i32) DomainResult~StockItem~
+    }
+    
+    %% API/Interface Layer
+    class CreateProductRequest {
+        +String name
+        +Option~String~ description
+        +String sku
+    }
+    
+    class ProductResponse {
+        +String id
+        +String name
+        +Option~String~ description
+        +String sku
+    }
+    
+    class ProductController {
+        +get_product(ProductService, Uuid) Result~ProductResponse~
+        +get_products(ProductService) Result~Vec~ProductResponse~~
+        +create_product(ProductService, CreateProductRequest) Result~ProductResponse~
+        +update_product(ProductService, Uuid, CreateProductRequest) Result~ProductResponse~
+        +delete_product(ProductService, Uuid) Result~()~
+    }
+    
+    %% Relationships
+    ProductRepository <|.. PostgresProductRepository : implements
+    StockRepository <|.. PostgresStockRepository : implements
+    
+    ProductService o-- ProductRepository : uses
+    ProductService o-- StockRepository : uses
+    
+    ProductController ..> ProductService : uses
+    ProductController ..> CreateProductRequest : uses
+    ProductController ..> ProductResponse : returns
+    
+    PostgresProductRepository ..> Product : manipulates
+    PostgresStockRepository ..> StockItem : manipulates
+    
+    Product <-- StockItem : references
