@@ -16,3 +16,4 @@ stock-infrastructure = { path = "../infrastructure" }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 uuid = { workspace = true }
+bigdecimal = {workspace = true}

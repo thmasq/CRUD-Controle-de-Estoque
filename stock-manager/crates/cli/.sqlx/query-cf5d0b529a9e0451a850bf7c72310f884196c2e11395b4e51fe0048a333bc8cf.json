@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT id, product_id, quantity, location, unit_cost, last_restocked\n            FROM stock_items\n            WHERE id = $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "product_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "quantity",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 3,
+        "name": "location",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "unit_cost",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 5,
+        "name": "last_restocked",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "cf5d0b529a9e0451a850bf7c72310f884196c2e11395b4e51fe0048a333bc8cf"
+}

@@ -1,0 +1,57 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO stock_items (id, product_id, quantity, location, unit_cost, last_restocked)\n            VALUES ($1, $2, $3, $4, $5, $6)\n            ON CONFLICT (id) DO UPDATE\n            SET product_id = $2, quantity = $3, location = $4, unit_cost = $5, last_restocked = $6\n            RETURNING id, product_id, quantity, location, unit_cost, last_restocked\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "product_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "quantity",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 3,
+        "name": "location",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "unit_cost",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 5,
+        "name": "last_restocked",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Int4",
+        "Varchar",
+        "Numeric",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "51848e8e05b84950bc79c694ee53df4b62b9dbdee2c1726a175bf24e6e2c4a46"
+}

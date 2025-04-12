@@ -9,7 +9,6 @@ actix-rt = { workspace = true }
 actix-web = { workspace = true }
 anyhow = { workspace = true }
 askama = { workspace = true }
-askama_actix = "0.14"
 sqlx = { workspace = true }
 stock-application = { path = "../application" }
 stock-domain = { path = "../domain" }
@@ -17,3 +16,6 @@ stock-infrastructure = { path = "../infrastructure" }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 uuid = { workspace = true }
+chrono = { workspace = true }
+bigdecimal = { workspace = true }
+serde = { workspace = true }

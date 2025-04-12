@@ -10,3 +10,4 @@ chrono = { workspace = true }
 stock-domain = { path = "../domain" }
 tracing = { workspace = true }
 uuid = { workspace = true }
+bigdecimal = { workspace = true }

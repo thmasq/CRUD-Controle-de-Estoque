@@ -1,0 +1,84 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: stock-manager-db
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-stock_manager}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-stock_manager}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - stock-network
+
+  seed:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: stock-manager-seed
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-stock_manager}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-stock_manager}
+      RUST_LOG: ${RUST_LOG:-info}
+    command: ./seed.sh
+    networks:
+      - stock-network
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: stock-manager-api
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-stock_manager}
+      RUST_LOG: ${RUST_LOG:-info}
+    ports:
+      - "${API_PORT:-8080}:8080"
+    command: ./stock-api-server
+    networks:
+      - stock-network
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: stock-manager-web
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-stock_manager}
+      RUST_LOG: ${RUST_LOG:-info}
+    ports:
+      - "${WEB_PORT:-8081}:8081"
+    command: ./stock-web-server
+    networks:
+      - stock-network
+
+networks:
+  stock-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
