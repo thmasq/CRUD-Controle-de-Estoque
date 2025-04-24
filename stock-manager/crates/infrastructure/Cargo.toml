@@ -6,10 +6,10 @@ edition = "2024"
 [dependencies]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
+chrono = { workspace = true }
 diesel = { workspace = true }
+rust_decimal = { workspace = true }
 stock-domain = { path = "../domain" }
 tokio = { workspace = true }
 tracing = { workspace = true }
 uuid = { workspace = true }
-chrono = { workspace = true }
-rust_decimal = { workspace = true }

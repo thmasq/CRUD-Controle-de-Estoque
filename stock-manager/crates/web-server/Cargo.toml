@@ -10,14 +10,14 @@ actix-web = { workspace = true }
 anyhow = { workspace = true }
 askama = { workspace = true }
 askama_actix = "0.14"
+chrono = { workspace = true }
 diesel = { workspace = true }
+dotenv = { workspace = true }
+rust_decimal = { workspace = true }
+serde = { workspace = true }
 stock-application = { path = "../application" }
 stock-domain = { path = "../domain" }
 stock-infrastructure = { path = "../infrastructure" }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 uuid = { workspace = true }
-dotenv = { workspace = true }
-serde = { workspace = true }
-chrono = { workspace = true }
-rust_decimal = { workspace = true }
