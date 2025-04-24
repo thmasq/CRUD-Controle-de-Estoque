@@ -10,7 +10,7 @@ actix-web = { workspace = true }
 anyhow = { workspace = true }
 askama = { workspace = true }
 askama_actix = "0.14"
-sqlx = { workspace = true }
+diesel = { workspace = true }
 stock-application = { path = "../application" }
 stock-domain = { path = "../domain" }
 stock-infrastructure = { path = "../infrastructure" }
