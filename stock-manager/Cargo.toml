@@ -16,13 +16,13 @@ actix-rt = "2.10"
 actix-web = "4.10"
 anyhow = "1.0"
 # For the web server
-askama = "0.13"
+askama = "0.14"
 askama_actix = "0.14" # Specific integration for Actix
 async-trait = "0.1"
 chrono = { version = "0.4", features = ["serde"] }
 # For the CLI and API
 clap = { version = "4.5", features = ["derive"] }
-rust_decimal = { version = "1.37", features = ["serde"] }
+rust_decimal = { version = "1.37", features = ["serde", "db-diesel-postgres"] }
 serde = { version = "1.0", features = ["derive"] }
 diesel = { version = "2.2", features = ["postgres", "uuid", "chrono", "numeric", "r2d2"] }
 diesel_migrations = "2.2"
@@ -31,5 +31,5 @@ thiserror = "2.0"
 # Rest of dependencies remain the same
 tokio = { version = "1.44", features = ["full"] }
 tracing = "0.1"
-tracing-subscriber = "0.3"
+tracing-subscriber = { version = "0.3", features = ["env-filter"]}
 uuid = { version = "1.16", features = ["v4", "serde"] }
