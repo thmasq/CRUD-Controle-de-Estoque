@@ -1,14 +1,7 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+pub mod db;
+pub mod models;
+pub mod repositories;
+pub mod schema;
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}
+// Re-export for easier access
+pub use db::{PgPool, PgPooledConnection, establish_connection_pool};
