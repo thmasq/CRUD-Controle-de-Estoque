@@ -9,7 +9,7 @@ actix-rt = { workspace = true }
 actix-web = { workspace = true }
 anyhow = { workspace = true }
 askama = { workspace = true }
-askama_actix = "0.14"
+askama_actix = { workspace = true }
 chrono = { workspace = true }
 diesel = { workspace = true }
 dotenv = { workspace = true }

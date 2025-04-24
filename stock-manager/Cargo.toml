@@ -17,7 +17,7 @@ actix-web = "4.10"
 anyhow = "1.0"
 # For the web server
 askama = "0.14"
-askama_actix = "0.14" # Specific integration for Actix
+askama_actix = "0.14"
 async-trait = "0.1"
 chrono = { version = "0.4", features = ["serde"] }
 # For the CLI and API
