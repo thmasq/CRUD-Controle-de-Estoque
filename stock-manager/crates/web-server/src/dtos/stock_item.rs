@@ -2,7 +2,7 @@ use crate::filters;
 use askama::Template;
 use chrono::{DateTime, Utc};
 use rust_decimal::Decimal;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use uuid::Uuid;
 
 #[derive(Template)]
@@ -58,8 +58,31 @@ pub struct StockItemUpdateRequest {
 	pub unit_cost: Decimal,
 }
 
+fn deserialize_optional_uuid<'de, D>(deserializer: D) -> Result<Option<Uuid>, D::Error>
+where
+	D: Deserializer<'de>,
+{
+	let s: Option<String> = Option::<String>::deserialize(deserializer)?;
+	match s {
+		None => Ok(None),
+		Some(s) if s.is_empty() => Ok(None),
+		Some(s) => match Uuid::parse_str(&s) {
+			Ok(id) => Ok(Some(id)),
+			Err(e) => Err(serde::de::Error::custom(e)),
+		},
+	}
+}
+
 #[derive(Debug, Deserialize)]
 pub struct StockItemFilterRequest {
+	#[serde(deserialize_with = "deserialize_optional_uuid", default)]
 	pub warehouse_id: Option<Uuid>,
+	#[serde(deserialize_with = "deserialize_optional_uuid", default)]
 	pub product_id: Option<Uuid>,
+}
+
+#[derive(Template)]
+#[template(path = "stock_items/table_rows.html")]
+pub struct StockItemTableRowsTemplate {
+	pub stock_items: Vec<StockItemDto>,
 }

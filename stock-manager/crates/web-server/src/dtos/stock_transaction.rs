@@ -38,3 +38,9 @@ pub struct TransactionFilterRequest {
 	pub transaction_type: Option<String>,
 	pub date: Option<String>,
 }
+
+#[derive(Template)]
+#[template(path = "transactions/table_rows.html")]
+pub struct TransactionTableRowsTemplate {
+	pub transactions: Vec<TransactionDto>,
+}

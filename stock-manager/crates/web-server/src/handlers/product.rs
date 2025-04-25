@@ -1,4 +1,4 @@
-use actix_web::{HttpResponse, Result, web};
+use actix_web::{HttpRequest, HttpResponse, Result, web};
 use askama::DynTemplate;
 use uuid::Uuid;
 
@@ -8,11 +8,12 @@ use crate::AppState;
 use crate::dtos::category::CategoryDto;
 use crate::dtos::product::{
 	ProductCreateRequest, ProductDto, ProductFilterRequest, ProductFormTemplate, ProductListTemplate,
-	ProductUpdateRequest,
+	ProductTableRowsTemplate, ProductUpdateRequest,
 };
 
 pub async fn list_products(
 	state: web::Data<AppState>,
+	req: HttpRequest,
 	query: web::Query<ProductFilterRequest>,
 ) -> Result<HttpResponse> {
 	let product_service = state.product_service.clone();
@@ -31,8 +32,11 @@ pub async fn list_products(
 
 	// Filter by status if specified
 	if let Some(ref status) = query.status {
-		let is_active = status == "active";
-		products = products.into_iter().filter(|p| p.is_active == is_active).collect();
+		// Only filter if status is not empty
+		if !status.is_empty() {
+			let is_active = status == "active";
+			products = products.into_iter().filter(|p| p.is_active == is_active).collect();
+		}
 	}
 
 	// Get categories
@@ -55,25 +59,36 @@ pub async fn list_products(
 		});
 	}
 
-	// Create category DTOs
-	let category_dtos: Vec<CategoryDto> = categories
-		.iter()
-		.map(|c| CategoryDto {
-			id: c.id,
-			name: c.name.clone(),
-			description: c.description.clone(),
-			product_count: 0,
-		})
-		.collect();
+	let is_htmx_request = req.headers().contains_key("HX-Request");
 
-	let template = ProductListTemplate {
-		products: product_dtos,
-		categories: category_dtos,
-	};
+	if is_htmx_request {
+		// Return just the table rows
+		let rows_template = ProductTableRowsTemplate { products: product_dtos };
 
-	Ok(HttpResponse::Ok()
-		.content_type("text/html")
-		.body(template.dyn_render().unwrap()))
+		Ok(HttpResponse::Ok()
+			.content_type("text/html")
+			.body(rows_template.dyn_render().unwrap()))
+	} else {
+		// Create category DTOs
+		let category_dtos: Vec<CategoryDto> = categories
+			.iter()
+			.map(|c| CategoryDto {
+				id: c.id,
+				name: c.name.clone(),
+				description: c.description.clone(),
+				product_count: 0,
+			})
+			.collect();
+
+		let template = ProductListTemplate {
+			products: product_dtos,
+			categories: category_dtos,
+		};
+
+		Ok(HttpResponse::Ok()
+			.content_type("text/html")
+			.body(template.dyn_render().unwrap()))
+	}
 }
 
 pub async fn new_product_form(state: web::Data<AppState>) -> Result<HttpResponse> {

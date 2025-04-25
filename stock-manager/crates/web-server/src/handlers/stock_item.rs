@@ -1,4 +1,4 @@
-use actix_web::{HttpResponse, Result, web};
+use actix_web::{HttpRequest, HttpResponse, Result, web};
 use askama::DynTemplate;
 use uuid::Uuid;
 
@@ -9,13 +9,14 @@ use crate::AppState;
 use crate::dtos::product::ProductDto;
 use crate::dtos::stock_item::{
 	StockItemCreateRequest, StockItemDto, StockItemFilterRequest, StockItemFormTemplate, StockItemListTemplate,
-	StockItemTransactionTemplate, StockItemUpdateRequest,
+	StockItemTableRowsTemplate, StockItemTransactionTemplate, StockItemUpdateRequest,
 };
 use crate::dtos::stock_transaction::TransactionCreateRequest;
 use crate::dtos::warehouse::WarehouseDto;
 
 pub async fn list_stock_items(
 	state: web::Data<AppState>,
+	req: HttpRequest,
 	query: web::Query<StockItemFilterRequest>,
 ) -> Result<HttpResponse> {
 	let stock_service = state.stock_item_service.clone();
@@ -68,40 +69,52 @@ pub async fn list_stock_items(
 		})
 		.collect();
 
-	// Create product and warehouse DTOs for filters
-	let product_dtos: Vec<ProductDto> = products
-		.iter()
-		.map(|p| ProductDto {
-			id: p.id,
-			name: p.name.clone(),
-			description: p.description.clone(),
-			sku: p.sku.clone(),
-			category_id: p.category_id,
-			category_name: None, // Not needed for dropdown
-			is_active: p.is_active,
-		})
-		.collect();
+	let is_htmx_request = req.headers().contains_key("HX-Request");
 
-	let warehouse_dtos: Vec<WarehouseDto> = warehouses
-		.iter()
-		.map(|w| WarehouseDto {
-			id: w.id,
-			name: w.name.clone(),
-			location: w.location.clone(),
-			contact_info: w.contact_info.clone(),
-			is_active: w.is_active,
-		})
-		.collect();
+	if is_htmx_request {
+		let rows_template = StockItemTableRowsTemplate {
+			stock_items: stock_item_dtos,
+		};
 
-	let template = StockItemListTemplate {
-		stock_items: stock_item_dtos,
-		products: product_dtos,
-		warehouses: warehouse_dtos,
-	};
+		Ok(HttpResponse::Ok()
+			.content_type("text/html")
+			.body(rows_template.dyn_render().unwrap()))
+	} else {
+		// Create product and warehouse DTOs for filters
+		let product_dtos: Vec<ProductDto> = products
+			.iter()
+			.map(|p| ProductDto {
+				id: p.id,
+				name: p.name.clone(),
+				description: p.description.clone(),
+				sku: p.sku.clone(),
+				category_id: p.category_id,
+				category_name: None,
+				is_active: p.is_active,
+			})
+			.collect();
 
-	Ok(HttpResponse::Ok()
-		.content_type("text/html")
-		.body(template.dyn_render().unwrap()))
+		let warehouse_dtos: Vec<WarehouseDto> = warehouses
+			.iter()
+			.map(|w| WarehouseDto {
+				id: w.id,
+				name: w.name.clone(),
+				location: w.location.clone(),
+				contact_info: w.contact_info.clone(),
+				is_active: w.is_active,
+			})
+			.collect();
+
+		let template = StockItemListTemplate {
+			stock_items: stock_item_dtos,
+			products: product_dtos,
+			warehouses: warehouse_dtos,
+		};
+
+		Ok(HttpResponse::Ok()
+			.content_type("text/html")
+			.body(template.dyn_render().unwrap()))
+	}
 }
 
 pub async fn new_stock_item_form(state: web::Data<AppState>) -> Result<HttpResponse> {

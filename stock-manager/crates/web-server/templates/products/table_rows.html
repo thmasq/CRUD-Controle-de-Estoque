@@ -1,0 +1,38 @@
+{% for product in products %}
+<tr id="product-row-{{ product.id }}">
+    <td class="px-6 py-4 whitespace-nowrap font-mono">{{ product.sku }}</td>
+    <td class="px-6 py-4 whitespace-nowrap">{{ product.name }}</td>
+    <td class="px-6 py-4 whitespace-nowrap">{{ product.category_name | default_option(value="--") }}</td>
+    <td class="px-6 py-4 whitespace-nowrap">
+        <span class="px-2 py-1 text-xs rounded-full 
+            {% if product.is_active %}bg-green-100 text-green-800
+            {% else %}bg-red-100 text-red-800{% endif %}">
+            {% if product.is_active %}Active{% else %}Inactive{% endif %}
+        </span>
+    </td>
+    <td class="px-6 py-4 whitespace-nowrap text-sm">
+        <button 
+            class="text-indigo-600 hover:text-indigo-900 mr-3"
+            hx-get="/products/{{ product.id }}/edit"
+            hx-target="#modal-container"
+            hx-trigger="click">
+            Edit
+        </button>
+        <button 
+            class="text-red-600 hover:text-red-900"
+            hx-delete="/products/{{ product.id }}"
+            hx-confirm="Are you sure you want to delete this product?"
+            hx-target="#product-row-{{ product.id }}"
+            hx-swap="outerHTML"
+            hx-trigger="click">
+            Delete
+        </button>
+    </td>
+</tr>
+{% endfor %}
+
+{% if products.is_empty() %}
+<tr>
+    <td colspan="5" class="px-6 py-4 text-center text-gray-500 italic">No products found</td>
+</tr>
+{% endif %}
