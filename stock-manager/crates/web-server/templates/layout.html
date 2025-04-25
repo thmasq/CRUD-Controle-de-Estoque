@@ -11,7 +11,7 @@
     </style>
     {% block head %}{% endblock %}
 </head>
-<body class="bg-gray-100 min-h-screen">
+<body class="flex flex-col min-h-screen">
     <header class="bg-indigo-600 text-white shadow-md">
         <div class="container mx-auto px-4 py-4">
             <div class="flex justify-between items-center">
@@ -71,6 +71,12 @@
         
         document.body.addEventListener('itemDeleted', function(evt) {
             showNotification('Item deleted successfully');
+        });
+
+        document.body.addEventListener('htmx:afterOnLoad', function(evt) {
+            if (evt.detail.target.id === 'modal-container' && evt.detail.target.innerHTML.trim() !== '') {
+                evt.detail.target.classList.remove('hidden');
+            }
         });
     </script>
 
