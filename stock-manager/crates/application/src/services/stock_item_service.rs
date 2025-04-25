@@ -38,6 +38,10 @@ impl StockItemService {
 		self.repository.find_all().await
 	}
 
+	pub async fn get_all_stock_items_with_inactive(&self) -> anyhow::Result<Vec<StockItem>> {
+		self.repository.find_all_with_inactive().await
+	}
+
 	pub async fn get_stock_items_by_product(&self, product_id: Uuid) -> anyhow::Result<Vec<StockItem>> {
 		self.repository.find_by_product(product_id).await
 	}
@@ -47,15 +51,36 @@ impl StockItemService {
 	}
 
 	pub async fn create_stock_item(&self, dto: StockItemCreateDto) -> anyhow::Result<StockItem> {
-		// Check if a stock item for this product and warehouse already exists
-		if let Some(_) = self
+		// Check if a stock item (including inactive) for this product and warehouse already exists
+		let existing_item_result = self
 			.repository
-			.find_by_product_and_warehouse(dto.product_id, dto.warehouse_id)
-			.await?
-		{
-			return Err(anyhow::anyhow!(
-				"Stock item for this product and warehouse already exists"
-			));
+			.find_by_product_and_warehouse_with_inactive(dto.product_id, dto.warehouse_id)
+			.await;
+
+		if let Ok(Some(existing_item)) = existing_item_result {
+			if !existing_item.is_active {
+				// Item exists but is marked as deleted - reactivate it with new values
+				let now = Utc::now();
+				let reactivated_item = StockItem {
+					id: existing_item.id,
+					product_id: existing_item.product_id,
+					warehouse_id: existing_item.warehouse_id,
+					quantity: dto.quantity,
+					unit_cost: dto.unit_cost,
+					last_restocked: now,
+					is_active: true, // Explicitly set to true for reactivation
+					created_at: existing_item.created_at,
+					updated_at: now,
+				};
+
+				// Update the item to reactivate it
+				return self.repository.update(reactivated_item).await;
+			} else {
+				// Active item already exists
+				return Err(anyhow::anyhow!(
+					"Stock item for this product and warehouse already exists"
+				));
+			}
 		}
 
 		let now = Utc::now();
@@ -66,6 +91,7 @@ impl StockItemService {
 			quantity: dto.quantity,
 			unit_cost: dto.unit_cost,
 			last_restocked: now,
+			is_active: true,
 			created_at: now,
 			updated_at: now,
 		};
@@ -86,7 +112,8 @@ impl StockItemService {
 			warehouse_id: existing.warehouse_id,
 			quantity: dto.quantity,
 			unit_cost: dto.unit_cost,
-			last_restocked: Utc::now(), // Update last_restocked when updating stock
+			last_restocked: Utc::now(),
+			is_active: existing.is_active,
 			created_at: existing.created_at,
 			updated_at: Utc::now(),
 		};

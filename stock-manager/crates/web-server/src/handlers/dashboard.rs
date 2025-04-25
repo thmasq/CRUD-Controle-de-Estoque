@@ -39,6 +39,7 @@ pub async fn index(state: web::Data<AppState>) -> Result<HttpResponse> {
 					quantity: item.quantity,
 					unit_cost: item.unit_cost,
 					last_restocked: item.last_restocked,
+					is_active: item.is_active,
 				});
 			}
 		}

@@ -45,12 +45,16 @@ impl StockTransactionService {
 	}
 
 	pub async fn create_transaction(&self, dto: StockTransactionCreateDto) -> anyhow::Result<StockTransaction> {
-		// Find the stock item
+		// Find the stock item (including inactive ones)
 		let stock_item = self
 			.stock_item_repository
-			.find_by_id(dto.stock_item_id)
+			.find_by_id_with_inactive(dto.stock_item_id)
 			.await?
 			.ok_or_else(|| anyhow::anyhow!("Stock item not found"))?;
+
+		if !stock_item.is_active {
+			return Err(anyhow::anyhow!("Cannot create transaction for inactive stock item"));
+		}
 
 		// Calculate new quantity based on transaction type
 		let new_quantity = match dto.transaction_type {
@@ -74,6 +78,7 @@ impl StockTransactionService {
 			last_restocked: stock_item.last_restocked,
 			created_at: stock_item.created_at,
 			updated_at: chrono::Utc::now(),
+			is_active: stock_item.is_active,
 		};
 		self.stock_item_repository.update(updated_stock_item).await?;
 

@@ -16,6 +16,7 @@ pub struct StockItemModel {
 	pub quantity: i32,
 	pub unit_cost: Decimal,
 	pub last_restocked: DateTime<Utc>,
+	pub is_active: bool,
 	pub created_at: DateTime<Utc>,
 	pub updated_at: DateTime<Utc>,
 }
@@ -30,6 +31,7 @@ pub struct NewStockItemModel {
 	pub quantity: i32,
 	pub unit_cost: Decimal,
 	pub last_restocked: DateTime<Utc>,
+	pub is_active: bool,
 }
 
 impl From<StockItemModel> for StockItem {
@@ -43,6 +45,7 @@ impl From<StockItemModel> for StockItem {
 			last_restocked: model.last_restocked,
 			created_at: model.created_at,
 			updated_at: model.updated_at,
+			is_active: model.is_active,
 		}
 	}
 }
@@ -56,6 +59,7 @@ impl From<StockItem> for NewStockItemModel {
 			quantity: entity.quantity,
 			unit_cost: entity.unit_cost,
 			last_restocked: entity.last_restocked,
+			is_active: entity.is_active,
 		}
 	}
 }

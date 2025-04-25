@@ -39,7 +39,10 @@ pub async fn list_transactions(
 	}
 
 	// Get all stock items
-	let stock_items = stock_service.get_all_stock_items().await.unwrap_or_default();
+	let stock_items = stock_service
+		.get_all_stock_items_with_inactive()
+		.await
+		.unwrap_or_default();
 
 	// Get all products and warehouses
 	let products = product_service.get_all_products().await.unwrap_or_default();

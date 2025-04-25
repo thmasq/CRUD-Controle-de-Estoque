@@ -14,6 +14,14 @@ pub trait StockItemRepository: Send + Sync {
 		product_id: Uuid,
 		warehouse_id: Uuid,
 	) -> anyhow::Result<Option<StockItem>>;
+	async fn find_by_id_with_inactive(&self, id: Uuid) -> anyhow::Result<Option<StockItem>>;
+	async fn find_all_with_inactive(&self) -> anyhow::Result<Vec<StockItem>>;
+	async fn find_by_product_and_warehouse_with_inactive(
+		&self,
+		product_id: Uuid,
+		warehouse_id: Uuid,
+	) -> anyhow::Result<Option<StockItem>>;
+
 	async fn create(&self, stock_item: StockItem) -> anyhow::Result<StockItem>;
 	async fn update(&self, stock_item: StockItem) -> anyhow::Result<StockItem>;
 	async fn delete(&self, id: Uuid) -> anyhow::Result<bool>;

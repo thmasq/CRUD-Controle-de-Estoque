@@ -63,6 +63,7 @@ pub async fn list_stock_items(
 				quantity: si.quantity,
 				unit_cost: si.unit_cost,
 				last_restocked: si.last_restocked,
+				is_active: si.is_active,
 			})
 		})
 		.collect();
@@ -150,6 +151,7 @@ pub async fn new_stock_item_form(state: web::Data<AppState>) -> Result<HttpRespo
 			quantity: 0,
 			unit_cost: rust_decimal::Decimal::new(0, 0),
 			last_restocked: chrono::Utc::now(),
+			is_active: true,
 		},
 		products: product_dtos,
 		warehouses: warehouse_dtos,
@@ -219,6 +221,7 @@ pub async fn edit_stock_item_form(path: web::Path<Uuid>, state: web::Data<AppSta
 				quantity: stock_item.quantity,
 				unit_cost: stock_item.unit_cost,
 				last_restocked: stock_item.last_restocked,
+				is_active: stock_item.is_active,
 			},
 			products: product_dtos,
 			warehouses: warehouse_dtos,
@@ -262,6 +265,7 @@ pub async fn transaction_form(path: web::Path<Uuid>, state: web::Data<AppState>)
 				quantity: stock_item.quantity,
 				unit_cost: stock_item.unit_cost,
 				last_restocked: stock_item.last_restocked,
+				is_active: stock_item.is_active,
 			},
 		};
 
@@ -313,6 +317,7 @@ pub async fn create_stock_item(
 				quantity: stock_item.quantity,
 				unit_cost: stock_item.unit_cost,
 				last_restocked: stock_item.last_restocked,
+				is_active: stock_item.is_active,
 			};
 
 			let html = format!(
@@ -454,6 +459,7 @@ pub async fn create_transaction(
 					quantity: stock_item.quantity,
 					unit_cost: stock_item.unit_cost,
 					last_restocked: stock_item.last_restocked,
+					is_active: stock_item.is_active,
 				};
 
 				let html = format!(

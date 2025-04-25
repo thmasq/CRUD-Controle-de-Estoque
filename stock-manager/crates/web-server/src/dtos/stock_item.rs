@@ -41,6 +41,7 @@ pub struct StockItemDto {
 	pub quantity: i32,
 	pub unit_cost: Decimal,
 	pub last_restocked: DateTime<Utc>,
+	pub is_active: bool,
 }
 
 #[derive(Debug, Deserialize)]
