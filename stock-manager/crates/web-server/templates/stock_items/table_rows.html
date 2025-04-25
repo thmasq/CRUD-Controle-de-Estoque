@@ -3,7 +3,7 @@
     <td class="px-6 py-4 whitespace-nowrap">{{ item.product_name }}</td>
     <td class="px-6 py-4 whitespace-nowrap">{{ item.warehouse_name }}</td>
     <td class="px-6 py-4 whitespace-nowrap">{{ item.quantity }}</td>
-    <td class="px-6 py-4 whitespace-nowrap">${{ item.unit_cost }}</td>
+    <td class="px-6 py-4 whitespace-nowrap">${{ item.unit_cost | format_decimal }}</td>
     <td class="px-6 py-4 whitespace-nowrap">{{ item.last_restocked | date }}</td>
     <td class="px-6 py-4 whitespace-nowrap text-sm">
         <button 

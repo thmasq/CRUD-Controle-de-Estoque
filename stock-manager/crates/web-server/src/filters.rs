@@ -31,12 +31,16 @@ pub fn default_int<'a>(value: &i32, _: &dyn askama::Values, default_value: &'a i
 
 pub fn default_decimal<'a>(value: &Decimal, _: &dyn askama::Values, default_value: &'a f64) -> askama::Result<String> {
 	if value.is_zero() {
-		Ok(default_value.to_string())
+		Ok(format!("{:.2}", default_value))
 	} else {
-		Ok(value.to_string())
+		Ok(format!("{:.2}", value))
 	}
 }
 
 pub fn option_uuid_eq(option_id: &Option<Uuid>, _: &dyn askama::Values, uuid: &Uuid) -> askama::Result<bool> {
 	Ok(option_id.as_ref() == Some(uuid))
+}
+
+pub fn format_decimal(value: &Decimal, _: &dyn askama::Values) -> askama::Result<String> {
+	Ok(format!("{:.2}", value))
 }
