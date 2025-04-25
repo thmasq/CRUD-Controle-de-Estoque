@@ -69,7 +69,7 @@
                         </span>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">{{ transaction.quantity }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap">{{ transaction.reference_number | default(value="--") }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">{{ transaction.reference_number | default_option(value="--") }}</td>
                     <td class="px-6 py-4 whitespace-nowrap">{{ transaction.created_by }}</td>
                 </tr>
                 {% endfor %}

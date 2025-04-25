@@ -29,7 +29,7 @@
                 {% for category in categories %}
                 <tr id="category-row-{{ category.id }}">
                     <td class="px-6 py-4 whitespace-nowrap">{{ category.name }}</td>
-                    <td class="px-6 py-4">{{ category.description | default(value="") }}</td>
+                    <td class="px-6 py-4">{{ category.description | default_option(value="") }}</td>
                     <td class="px-6 py-4 whitespace-nowrap">{{ category.product_count }}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm">
                         <button 

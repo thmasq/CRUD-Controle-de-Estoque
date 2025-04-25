@@ -31,7 +31,7 @@
                 <tr id="warehouse-row-{{ warehouse.id }}">
                     <td class="px-6 py-4 whitespace-nowrap">{{ warehouse.name }}</td>
                     <td class="px-6 py-4">{{ warehouse.location }}</td>
-                    <td class="px-6 py-4">{{ warehouse.contact_info | default(value="--") }}</td>
+                    <td class="px-6 py-4">{{ warehouse.contact_info | default_option(value="--") }}</td>
                     <td class="px-6 py-4 whitespace-nowrap">
                         <span class="px-2 py-1 text-xs rounded-full 
                             {% if warehouse.is_active %}bg-green-100 text-green-800

@@ -7,6 +7,7 @@ use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
 mod dtos;
+mod filters;
 mod handlers;
 
 use stock_application::{CategoryService, ProductService, StockItemService, StockTransactionService, WarehouseService};
