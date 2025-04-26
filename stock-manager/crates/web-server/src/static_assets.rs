@@ -10,7 +10,7 @@ async fn get_static_file(path: web::Path<String>) -> Result<HttpResponse> {
 	let path = path.into_inner();
 
 	if let Some(content) = StaticAssets::get(&path) {
-		let content_type = match path.split('.').last() {
+		let content_type = match path.split('.').next_back() {
 			Some("js") => "application/javascript",
 			Some("css") => "text/css",
 			Some("woff") => "font/woff",
@@ -32,5 +32,6 @@ async fn get_static_file(path: web::Path<String>) -> Result<HttpResponse> {
 }
 
 pub fn register(config: &mut web::ServiceConfig) {
+	#[allow(clippy::literal_string_with_formatting_args)]
 	config.service(web::resource("/_static/{filename:.*}").route(web::get().to(get_static_file)));
 }

@@ -48,7 +48,7 @@ pub async fn new_category_form() -> Result<HttpResponse> {
 		form_method: "post".to_string(),
 		category: CategoryDto {
 			id: Uuid::nil(),
-			name: "".to_string(),
+			name: String::new(),
 			description: None,
 			product_count: 0,
 		},
@@ -66,7 +66,7 @@ pub async fn edit_category_form(path: web::Path<Uuid>, state: web::Data<AppState
 	if let Some(category) = service.get_category(category_id).await.unwrap_or(None) {
 		let template = CategoryFormTemplate {
 			form_title: "Edit Category".to_string(),
-			form_action: format!("/categories/{}", category_id),
+			form_action: format!("/categories/{category_id}"),
 			form_method: "put".to_string(),
 			category: CategoryDto {
 				id: category.id,
@@ -139,7 +139,7 @@ pub async fn create_category(
 				.content_type("text/html")
 				.body(html))
 		},
-		Err(e) => Ok(HttpResponse::InternalServerError().body(format!("Failed to create category: {}", e))),
+		Err(e) => Ok(HttpResponse::InternalServerError().body(format!("Failed to create category: {e}"))),
 	}
 }
 
@@ -159,7 +159,7 @@ pub async fn update_category(
 
 	match service.update_category(dto).await {
 		Ok(_category) => Ok(HttpResponse::Ok().append_header(("HX-Trigger", "itemUpdated")).finish()),
-		Err(e) => Ok(HttpResponse::InternalServerError().body(format!("Failed to update category: {}", e))),
+		Err(e) => Ok(HttpResponse::InternalServerError().body(format!("Failed to update category: {e}"))),
 	}
 }
 
@@ -170,6 +170,6 @@ pub async fn delete_category(path: web::Path<Uuid>, state: web::Data<AppState>) 
 	match service.delete_category(category_id).await {
 		Ok(true) => Ok(HttpResponse::Ok().append_header(("HX-Trigger", "itemDeleted")).finish()),
 		Ok(false) => Ok(HttpResponse::NotFound().body("Category not found")),
-		Err(e) => Ok(HttpResponse::InternalServerError().body(format!("Failed to delete category: {}", e))),
+		Err(e) => Ok(HttpResponse::InternalServerError().body(format!("Failed to delete category: {e}"))),
 	}
 }

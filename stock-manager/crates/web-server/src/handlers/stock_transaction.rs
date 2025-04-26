@@ -24,10 +24,7 @@ pub async fn list_transactions(
 	if let Some(ref transaction_type) = query.transaction_type {
 		// Only filter if transaction_type is not empty
 		if !transaction_type.is_empty() {
-			transactions = transactions
-				.into_iter()
-				.filter(|t| t.transaction_type.to_string() == *transaction_type)
-				.collect();
+			transactions.retain(|t| t.transaction_type.to_string() == *transaction_type);
 		}
 	}
 
@@ -39,10 +36,7 @@ pub async fn list_transactions(
 				let start_of_day = Utc.from_utc_datetime(&date.and_hms_opt(0, 0, 0).unwrap());
 				let end_of_day = Utc.from_utc_datetime(&date.and_hms_opt(23, 59, 59).unwrap());
 
-				transactions = transactions
-					.into_iter()
-					.filter(|t| t.created_at >= start_of_day && t.created_at <= end_of_day)
-					.collect();
+				transactions.retain(|t| t.created_at >= start_of_day && t.created_at <= end_of_day);
 			}
 		}
 	}

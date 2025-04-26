@@ -51,7 +51,7 @@ impl ProductService {
 
 	pub async fn create_product(&self, dto: ProductCreateDto) -> anyhow::Result<Product> {
 		// Check if product with the same SKU already exists
-		if let Some(_) = self.repository.find_by_sku(&dto.sku).await? {
+		if (self.repository.find_by_sku(&dto.sku).await?).is_some() {
 			return Err(anyhow::anyhow!("Product with this SKU already exists"));
 		}
 
@@ -78,10 +78,8 @@ impl ProductService {
 			.ok_or_else(|| anyhow::anyhow!("Product not found"))?;
 
 		// If SKU changed, check if the new SKU is unique
-		if existing.sku != dto.sku {
-			if let Some(_) = self.repository.find_by_sku(&dto.sku).await? {
-				return Err(anyhow::anyhow!("Product with this SKU already exists"));
-			}
+		if existing.sku != dto.sku && (self.repository.find_by_sku(&dto.sku).await?).is_some() {
+			return Err(anyhow::anyhow!("Product with this SKU already exists"));
 		}
 
 		let product = Product {

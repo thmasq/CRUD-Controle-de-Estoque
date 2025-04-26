@@ -58,7 +58,12 @@ impl StockItemService {
 			.await;
 
 		if let Ok(Some(existing_item)) = existing_item_result {
-			if !existing_item.is_active {
+			if existing_item.is_active {
+				// Active item already exists
+				return Err(anyhow::anyhow!(
+					"Stock item for this product and warehouse already exists"
+				));
+			} else {
 				// Item exists but is marked as deleted - reactivate it with new values
 				let now = Utc::now();
 				let reactivated_item = StockItem {
@@ -75,11 +80,6 @@ impl StockItemService {
 
 				// Update the item to reactivate it
 				return self.repository.update(reactivated_item).await;
-			} else {
-				// Active item already exists
-				return Err(anyhow::anyhow!(
-					"Stock item for this product and warehouse already exists"
-				));
 			}
 		}
 

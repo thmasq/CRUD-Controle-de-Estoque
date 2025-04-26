@@ -21,7 +21,7 @@ pub fn default_option(value: &Option<String>, _: &dyn askama::Values, default_va
 	}
 }
 
-pub fn default_int<'a>(value: &i32, _: &dyn askama::Values, default_value: &'a i32) -> askama::Result<String> {
+pub fn default_int(value: &i32, _: &dyn askama::Values, default_value: &i32) -> askama::Result<String> {
 	if *value == 0 {
 		Ok(default_value.to_string())
 	} else {
@@ -29,11 +29,11 @@ pub fn default_int<'a>(value: &i32, _: &dyn askama::Values, default_value: &'a i
 	}
 }
 
-pub fn default_decimal<'a>(value: &Decimal, _: &dyn askama::Values, default_value: &'a f64) -> askama::Result<String> {
+pub fn default_decimal(value: &Decimal, _: &dyn askama::Values, default_value: &f64) -> askama::Result<String> {
 	if value.is_zero() {
-		Ok(format!("{:.2}", default_value))
+		Ok(format!("{default_value:.2}"))
 	} else {
-		Ok(format!("{:.2}", value))
+		Ok(format!("{value:.2}"))
 	}
 }
 
@@ -42,5 +42,5 @@ pub fn option_uuid_eq(option_id: &Option<Uuid>, _: &dyn askama::Values, uuid: &U
 }
 
 pub fn format_decimal(value: &Decimal, _: &dyn askama::Values) -> askama::Result<String> {
-	Ok(format!("{:.2}", value))
+	Ok(format!("{value:.2}"))
 }

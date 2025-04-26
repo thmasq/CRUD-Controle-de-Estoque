@@ -24,10 +24,7 @@ pub async fn list_products(
 
 	// Filter by category if specified
 	if let Some(category_id) = query.category_id {
-		products = products
-			.into_iter()
-			.filter(|p| p.category_id.is_some() && p.category_id.unwrap() == category_id)
-			.collect();
+		products.retain(|p| p.category_id.is_some() && p.category_id.unwrap() == category_id);
 	}
 
 	// Filter by status if specified
@@ -35,7 +32,7 @@ pub async fn list_products(
 		// Only filter if status is not empty
 		if !status.is_empty() {
 			let is_active = status == "active";
-			products = products.into_iter().filter(|p| p.is_active == is_active).collect();
+			products.retain(|p| p.is_active == is_active);
 		}
 	}
 
@@ -111,9 +108,9 @@ pub async fn new_product_form(state: web::Data<AppState>) -> Result<HttpResponse
 		form_method: "post".to_string(),
 		product: ProductDto {
 			id: Uuid::nil(),
-			name: "".to_string(),
+			name: String::new(),
 			description: None,
-			sku: "".to_string(),
+			sku: String::new(),
 			category_id: None,
 			category_name: None,
 			is_active: true,
@@ -150,7 +147,7 @@ pub async fn edit_product_form(path: web::Path<Uuid>, state: web::Data<AppState>
 
 		let template = ProductFormTemplate {
 			form_title: "Edit Product".to_string(),
-			form_action: format!("/products/{}", product_id),
+			form_action: format!("/products/{product_id}"),
 			form_method: "put".to_string(),
 			product: ProductDto {
 				id: product.id,
@@ -254,7 +251,7 @@ pub async fn create_product(state: web::Data<AppState>, form: web::Form<ProductC
 				.content_type("text/html")
 				.body(html))
 		},
-		Err(e) => Ok(HttpResponse::InternalServerError().body(format!("Failed to create product: {}", e))),
+		Err(e) => Ok(HttpResponse::InternalServerError().body(format!("Failed to create product: {e}"))),
 	}
 }
 
@@ -280,7 +277,7 @@ pub async fn update_product(
 			.append_header(("HX-Trigger", "itemUpdated"))
 			.append_header(("HX-Redirect", "/products"))
 			.finish()),
-		Err(e) => Ok(HttpResponse::InternalServerError().body(format!("Failed to update product: {}", e))),
+		Err(e) => Ok(HttpResponse::InternalServerError().body(format!("Failed to update product: {e}"))),
 	}
 }
 
@@ -291,6 +288,6 @@ pub async fn delete_product(path: web::Path<Uuid>, state: web::Data<AppState>) -
 	match service.delete_product(product_id).await {
 		Ok(true) => Ok(HttpResponse::Ok().append_header(("HX-Trigger", "itemDeleted")).finish()),
 		Ok(false) => Ok(HttpResponse::NotFound().body("Product not found")),
-		Err(e) => Ok(HttpResponse::InternalServerError().body(format!("Failed to delete product: {}", e))),
+		Err(e) => Ok(HttpResponse::InternalServerError().body(format!("Failed to delete product: {e}"))),
 	}
 }

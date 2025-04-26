@@ -5,7 +5,8 @@ use std::env;
 pub type PgPool = Pool<ConnectionManager<PgConnection>>;
 pub type PgPooledConnection = PooledConnection<ConnectionManager<PgConnection>>;
 
-#[must_use] pub fn establish_connection_pool() -> PgPool {
+#[must_use]
+pub fn establish_connection_pool() -> PgPool {
 	let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
 	let manager = ConnectionManager::<PgConnection>::new(database_url);
 	Pool::builder()

@@ -16,7 +16,8 @@ pub struct DieselProductRepository {
 }
 
 impl DieselProductRepository {
-	#[must_use] pub const fn new(pool: Arc<PgPool>) -> Self {
+	#[must_use]
+	pub const fn new(pool: Arc<PgPool>) -> Self {
 		Self { pool }
 	}
 }

@@ -40,8 +40,8 @@ pub async fn new_warehouse_form() -> Result<HttpResponse> {
 		form_method: "post".to_string(),
 		warehouse: WarehouseDto {
 			id: Uuid::nil(),
-			name: "".to_string(),
-			location: "".to_string(),
+			name: String::new(),
+			location: String::new(),
 			contact_info: None,
 			is_active: true,
 		},
@@ -59,7 +59,7 @@ pub async fn edit_warehouse_form(path: web::Path<Uuid>, state: web::Data<AppStat
 	if let Some(warehouse) = service.get_warehouse(warehouse_id).await.unwrap_or(None) {
 		let template = WarehouseFormTemplate {
 			form_title: "Edit Warehouse".to_string(),
-			form_action: format!("/warehouses/{}", warehouse_id),
+			form_action: format!("/warehouses/{warehouse_id}"),
 			form_method: "put".to_string(),
 			warehouse: WarehouseDto {
 				id: warehouse.id,
@@ -152,7 +152,7 @@ pub async fn create_warehouse(
 				.content_type("text/html")
 				.body(html))
 		},
-		Err(e) => Ok(HttpResponse::InternalServerError().body(format!("Failed to create warehouse: {}", e))),
+		Err(e) => Ok(HttpResponse::InternalServerError().body(format!("Failed to create warehouse: {e}"))),
 	}
 }
 
@@ -177,7 +177,7 @@ pub async fn update_warehouse(
 			.append_header(("HX-Trigger", "itemUpdated"))
 			.append_header(("HX-Redirect", "/warehouses"))
 			.finish()),
-		Err(e) => Ok(HttpResponse::InternalServerError().body(format!("Failed to update warehouse: {}", e))),
+		Err(e) => Ok(HttpResponse::InternalServerError().body(format!("Failed to update warehouse: {e}"))),
 	}
 }
 
@@ -188,6 +188,6 @@ pub async fn delete_warehouse(path: web::Path<Uuid>, state: web::Data<AppState>)
 	match service.delete_warehouse(warehouse_id).await {
 		Ok(true) => Ok(HttpResponse::Ok().append_header(("HX-Trigger", "itemDeleted")).finish()),
 		Ok(false) => Ok(HttpResponse::NotFound().body("Warehouse not found")),
-		Err(e) => Ok(HttpResponse::InternalServerError().body(format!("Failed to delete warehouse: {}", e))),
+		Err(e) => Ok(HttpResponse::InternalServerError().body(format!("Failed to delete warehouse: {e}"))),
 	}
 }

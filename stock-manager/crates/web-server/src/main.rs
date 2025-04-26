@@ -69,7 +69,7 @@ async fn main() -> std::io::Result<()> {
 
 	let host = env::var("HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
 	let port = env::var("PORT").unwrap_or_else(|_| "8080".to_string());
-	let bind_address = format!("{}:{}", host, port);
+	let bind_address = format!("{host}:{port}");
 
 	// Start HTTP server
 	let server = HttpServer::new(move || {
@@ -154,6 +154,6 @@ async fn main() -> std::io::Result<()> {
 	.bind(&bind_address)?
 	.run();
 
-	println!("Server running at http://{}", bind_address);
+	println!("Server running at http://{bind_address}");
 	server.await
 }

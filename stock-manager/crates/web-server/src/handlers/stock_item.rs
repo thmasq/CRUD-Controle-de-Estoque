@@ -35,17 +35,11 @@ pub async fn list_stock_items(
 
 	// Filter stock items if needed
 	if let Some(product_id) = query.product_id {
-		stock_items = stock_items
-			.into_iter()
-			.filter(|si| si.product_id == product_id)
-			.collect();
+		stock_items.retain(|si| si.product_id == product_id);
 	}
 
 	if let Some(warehouse_id) = query.warehouse_id {
-		stock_items = stock_items
-			.into_iter()
-			.filter(|si| si.warehouse_id == warehouse_id)
-			.collect();
+		stock_items.retain(|si| si.warehouse_id == warehouse_id);
 	}
 
 	// Create DTOs
@@ -158,9 +152,9 @@ pub async fn new_stock_item_form(state: web::Data<AppState>) -> Result<HttpRespo
 		stock_item: StockItemDto {
 			id: Uuid::nil(),
 			product_id: Uuid::nil(),
-			product_name: "".to_string(),
+			product_name: String::new(),
 			warehouse_id: Uuid::nil(),
-			warehouse_name: "".to_string(),
+			warehouse_name: String::new(),
 			quantity: 0,
 			unit_cost: rust_decimal::Decimal::new(0, 0),
 			last_restocked: chrono::Utc::now(),
@@ -223,7 +217,7 @@ pub async fn edit_stock_item_form(path: web::Path<Uuid>, state: web::Data<AppSta
 
 		let template = StockItemFormTemplate {
 			form_title: "Edit Stock Item".to_string(),
-			form_action: format!("/stock-items/{}", stock_item_id),
+			form_action: format!("/stock-items/{stock_item_id}"),
 			form_method: "put".to_string(),
 			stock_item: StockItemDto {
 				id: stock_item.id,
@@ -268,7 +262,7 @@ pub async fn transaction_form(path: web::Path<Uuid>, state: web::Data<AppState>)
 			.ok_or_else(|| actix_web::error::ErrorNotFound("Warehouse not found"))?;
 
 		let template = StockItemTransactionTemplate {
-			form_action: format!("/stock-items/{}/transaction", stock_item_id),
+			form_action: format!("/stock-items/{stock_item_id}/transaction"),
 			stock_item: StockItemDto {
 				id: stock_item.id,
 				product_id: stock_item.product_id,
@@ -379,7 +373,7 @@ pub async fn create_stock_item(
 				.content_type("text/html")
 				.body(html))
 		},
-		Err(e) => Ok(HttpResponse::InternalServerError().body(format!("Failed to create stock item: {}", e))),
+		Err(e) => Ok(HttpResponse::InternalServerError().body(format!("Failed to create stock item: {e}"))),
 	}
 }
 
@@ -402,7 +396,7 @@ pub async fn update_stock_item(
 			.append_header(("HX-Trigger", "itemUpdated"))
 			.append_header(("HX-Redirect", "/stock-items"))
 			.finish()),
-		Err(e) => Ok(HttpResponse::InternalServerError().body(format!("Failed to update stock item: {}", e))),
+		Err(e) => Ok(HttpResponse::InternalServerError().body(format!("Failed to update stock item: {e}"))),
 	}
 }
 
@@ -413,7 +407,7 @@ pub async fn delete_stock_item(path: web::Path<Uuid>, state: web::Data<AppState>
 	match stock_service.delete_stock_item(stock_item_id).await {
 		Ok(true) => Ok(HttpResponse::Ok().append_header(("HX-Trigger", "itemDeleted")).finish()),
 		Ok(false) => Ok(HttpResponse::NotFound().body("Stock item not found")),
-		Err(e) => Ok(HttpResponse::InternalServerError().body(format!("Failed to delete stock item: {}", e))),
+		Err(e) => Ok(HttpResponse::InternalServerError().body(format!("Failed to delete stock item: {e}"))),
 	}
 }
 
@@ -524,6 +518,6 @@ pub async fn create_transaction(
 				Ok(HttpResponse::NotFound().body("Stock item not found"))
 			}
 		},
-		Err(e) => Ok(HttpResponse::InternalServerError().body(format!("Failed to create transaction: {}", e))),
+		Err(e) => Ok(HttpResponse::InternalServerError().body(format!("Failed to create transaction: {e}"))),
 	}
 }
