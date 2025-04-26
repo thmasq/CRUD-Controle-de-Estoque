@@ -57,14 +57,14 @@ jobs:
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/stockmanager_test
 
   lint:
-    name: Lint
+    name: Lint with Nightly
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install stable toolchain
-        uses: dtolnay/rust-toolchain@stable
+      - name: Install nightly toolchain
+        uses: dtolnay/rust-toolchain@nightly
         with:
           components: rustfmt, clippy
 
@@ -75,10 +75,10 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-nightly-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Check format
-        run: cargo fmt --manifest-path stock-manager/Cargo.toml --all -- --check
+        run: cargo +nightly fmt --manifest-path stock-manager/Cargo.toml --all -- --check
 
       - name: Check with clippy
-        run: cargo clippy --manifest-path stock-manager/Cargo.toml -- -D warnings
+        run: cargo +nightly clippy --manifest-path stock-manager/Cargo.toml -- -D warnings
