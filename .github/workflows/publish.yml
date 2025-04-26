@@ -41,7 +41,7 @@ jobs:
           image = "ghcr.io/cross-rs/aarch64-unknown-linux-gnu:latest"
           pre-build = [
           "apt-get update",
-          "apt-get install -y --no-install-recommends libssl-dev"
+          "apt-get install -y --no-install-recommends libssl-dev libpq-dev"
           ]
           [target.aarch64-unknown-linux-gnu.env]
           passthrough = [
@@ -53,7 +53,7 @@ jobs:
           image = "ghcr.io/cross-rs/x86_64-unknown-linux-gnu:latest"
           pre-build = [
           "apt-get update",
-          "apt-get install -y --no-install-recommends libssl-dev"
+          "apt-get install -y --no-install-recommends libssl-dev libpq-dev"
           ]
           [target.x86_64-unknown-linux-gnu.env]
           passthrough = [
