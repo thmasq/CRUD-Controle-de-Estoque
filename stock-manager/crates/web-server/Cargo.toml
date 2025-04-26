@@ -13,6 +13,7 @@ askama_actix = { workspace = true }
 chrono = { workspace = true }
 diesel = { workspace = true }
 dotenv = { workspace = true }
+rust-embed = { workspace = true }
 rust_decimal = { workspace = true }
 serde = { workspace = true }
 stock-application = { path = "../application" }
@@ -21,7 +22,6 @@ stock-infrastructure = { path = "../infrastructure" }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 uuid = { workspace = true }
-rust-embed = { workspace = true }
 
 [build-dependencies]
 reqwest = { version = "0.12", features = ["blocking"] }

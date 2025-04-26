@@ -1,0 +1,41 @@
+FROM debian:bookworm-slim
+
+# Install runtime dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends ca-certificates libpq5 && \
+    rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /app
+
+# Create directory structure
+RUN mkdir -p /app/bin/amd64 /app/bin/arm64
+
+# Copy the pre-built binaries
+COPY target/x86_64-unknown-linux-gnu/release/stock-web-server /app/bin/amd64/
+COPY target/aarch64-unknown-linux-gnu/release/stock-web-server /app/bin/arm64/
+
+# Detect architecture and use the appropriate binary
+RUN if [ "$(uname -m)" = "x86_64" ]; then \
+        cp /app/bin/amd64/stock-web-server /usr/local/bin/; \
+    elif [ "$(uname -m)" = "aarch64" ]; then \
+        cp /app/bin/arm64/stock-web-server /usr/local/bin/; \
+    else \
+        echo "Unsupported architecture: $(uname -m)"; \
+        exit 1; \
+    fi
+
+# Copy the init.sql file
+COPY init.sql /app/init.sql
+
+# Expose the application port
+EXPOSE 8080
+
+# Set environment variables
+ENV RUST_LOG=stock_web_server=debug,actix_web=info
+ENV DATABASE_URL=postgres://postgres:postgres@db:5432/stockmanager
+ENV HOST=0.0.0.0
+ENV PORT=8080
+
+# Run the application
+CMD ["stock-web-server"]

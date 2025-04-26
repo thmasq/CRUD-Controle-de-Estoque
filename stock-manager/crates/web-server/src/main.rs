@@ -1,3 +1,4 @@
+use std::env;
 use std::sync::Arc;
 
 use actix_web::{App, HttpServer, middleware, web};
@@ -65,6 +66,10 @@ async fn main() -> std::io::Result<()> {
 		stock_item_service,
 		transaction_service,
 	});
+
+	let host = env::var("HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
+	let port = env::var("PORT").unwrap_or_else(|_| "8080".to_string());
+	let bind_address = format!("{}:{}", host, port);
 
 	// Start HTTP server
 	let server = HttpServer::new(move || {
@@ -146,9 +151,9 @@ async fn main() -> std::io::Result<()> {
 				web::get().to(handlers::stock_transaction::list_transactions),
 			)
 	})
-	.bind("127.0.0.1:8080")?
+	.bind(&bind_address)?
 	.run();
 
-	println!("Server running at http://127.0.0.1:8080");
+	println!("Server running at http://{}", bind_address);
 	server.await
 }
