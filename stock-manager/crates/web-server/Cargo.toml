@@ -21,3 +21,7 @@ stock-infrastructure = { path = "../infrastructure" }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 uuid = { workspace = true }
+rust-embed = { workspace = true }
+
+[build-dependencies]
+reqwest = { version = "0.12", features = ["blocking"] }

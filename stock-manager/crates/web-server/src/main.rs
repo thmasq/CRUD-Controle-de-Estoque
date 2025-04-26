@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use actix_files as fs;
 use actix_web::{App, HttpServer, middleware, web};
 use dotenv::dotenv;
 use tracing_subscriber::layer::SubscriberExt;
@@ -9,6 +8,7 @@ use tracing_subscriber::util::SubscriberInitExt;
 mod dtos;
 mod filters;
 mod handlers;
+mod static_assets;
 
 use stock_application::{CategoryService, ProductService, StockItemService, StockTransactionService, WarehouseService};
 use stock_infrastructure::db::establish_connection_pool;
@@ -71,6 +71,7 @@ async fn main() -> std::io::Result<()> {
 		App::new()
 			.wrap(middleware::Logger::default())
 			.app_data(app_state.clone())
+			.configure(static_assets::register)
 			// Dashboard
 			.route("/", web::get().to(handlers::dashboard::index))
 			// Categories
@@ -144,8 +145,6 @@ async fn main() -> std::io::Result<()> {
 				"/transactions",
 				web::get().to(handlers::stock_transaction::list_transactions),
 			)
-			// Static files
-			.service(fs::Files::new("/static", "./static").show_files_listing())
 	})
 	.bind("127.0.0.1:8080")?
 	.run();
