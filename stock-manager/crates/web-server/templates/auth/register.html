@@ -1,0 +1,40 @@
+{% extends "layout.html" %}
+
+{% block title %}Register - Stock Manager{% endblock %}
+
+{% block content %}
+<div class="max-w-md mx-auto mt-10 bg-white p-8 rounded-lg shadow-md">
+    <h1 class="text-2xl font-bold mb-6 text-center">Register</h1>
+    
+    <form method="post" action="/auth/register">
+        <div class="mb-4">
+            <label for="username" class="block text-sm font-medium text-gray-700 mb-1">Username</label>
+            <input type="text" id="username" name="username" required
+                   class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+        </div>
+        
+        <div class="mb-4">
+            <label for="password" class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+            <input type="password" id="password" name="password" required
+                   class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+        </div>
+        
+        <div class="mb-6">
+            <label for="role" class="block text-sm font-medium text-gray-700 mb-1">Role</label>
+            <select id="role" name="role" required
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                <option value="SELLER">Seller</option>
+                <option value="MANAGER">Manager</option>
+            </select>
+        </div>
+        
+        <button type="submit" class="w-full bg-indigo-600 text-white py-2 px-4 rounded hover:bg-indigo-700">
+            Register
+        </button>
+    </form>
+    
+    <div class="mt-4 text-center">
+        <p class="text-sm text-gray-600">Already have an account? <a href="/auth/login" class="text-indigo-600 hover:underline">Login</a></p>
+    </div>
+</div>
+{% endblock %}

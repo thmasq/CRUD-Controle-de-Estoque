@@ -1,14 +1,17 @@
 use std::env;
 use std::sync::Arc;
 
-use actix_web::{App, HttpServer, middleware, web};
+use actix_web::{App, HttpServer, web};
 use dotenv::dotenv;
+use stock_application::services::auth_service::AuthService;
+use stock_infrastructure::repositories::user_repository::DieselUserRepository;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
 mod dtos;
 mod filters;
 mod handlers;
+mod middleware;
 mod static_assets;
 
 use stock_application::{CategoryService, ProductService, StockItemService, StockTransactionService, WarehouseService};
@@ -26,11 +29,15 @@ pub struct AppState {
 	warehouse_service: Arc<WarehouseService>,
 	stock_item_service: Arc<StockItemService>,
 	transaction_service: Arc<StockTransactionService>,
+	auth_service: Arc<AuthService>,
+	jwt_secret: String,
 }
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
 	dotenv().ok();
+
+	let jwt_secret = env::var("JWT_SECRET").unwrap_or_else(|_| "6561df437ac7ad6d26aaabc34dacb267".to_string());
 
 	// Initialize tracing
 	tracing_subscriber::registry()
@@ -50,6 +57,7 @@ async fn main() -> std::io::Result<()> {
 	let warehouse_repo = Arc::new(DieselWarehouseRepository::new(pool.clone()));
 	let stock_item_repo = Arc::new(DieselStockItemRepository::new(pool.clone()));
 	let transaction_repo = Arc::new(DieselStockTransactionRepository::new(pool.clone()));
+	let user_repo = Arc::new(DieselUserRepository::new(pool.clone()));
 
 	// Create services
 	let category_service = Arc::new(CategoryService::new(category_repo));
@@ -57,6 +65,7 @@ async fn main() -> std::io::Result<()> {
 	let warehouse_service = Arc::new(WarehouseService::new(warehouse_repo));
 	let stock_item_service = Arc::new(StockItemService::new(stock_item_repo.clone()));
 	let transaction_service = Arc::new(StockTransactionService::new(transaction_repo, stock_item_repo));
+	let auth_service = Arc::new(AuthService::new(user_repo, jwt_secret.clone()));
 
 	// Create app state
 	let app_state = web::Data::new(AppState {
@@ -65,6 +74,8 @@ async fn main() -> std::io::Result<()> {
 		warehouse_service,
 		stock_item_service,
 		transaction_service,
+		auth_service,
+		jwt_secret,
 	});
 
 	let host = env::var("HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
@@ -74,9 +85,22 @@ async fn main() -> std::io::Result<()> {
 	// Start HTTP server
 	let server = HttpServer::new(move || {
 		App::new()
-			.wrap(middleware::Logger::default())
+			.wrap(actix_web::middleware::Logger::default())
+			.wrap(middleware::auth::Authentication {
+				exclude_paths: vec![
+					"/auth/login".to_string(),
+					"/auth/register".to_string(),
+					"/_static".to_string(),
+				],
+			})
 			.app_data(app_state.clone())
 			.configure(static_assets::register)
+			// Auth routes
+			.route("/auth/login", web::get().to(handlers::auth::login_form))
+			// .route("/auth/register", web::get().to(handlers::auth::register_form))
+			.route("/auth/login", web::post().to(handlers::auth::login))
+			// .route("/auth/register", web::post().to(handlers::auth::register))
+			.route("/auth/logout", web::get().to(handlers::auth::logout))
 			// Dashboard
 			.route("/", web::get().to(handlers::dashboard::index))
 			// Categories
