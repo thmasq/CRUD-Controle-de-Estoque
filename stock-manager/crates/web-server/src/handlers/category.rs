@@ -22,7 +22,7 @@ pub async fn list_categories(state: web::Data<AppState>) -> Result<HttpResponse>
 		let product_count = products
 			.iter()
 			.filter(|p| p.category_id.is_some() && p.category_id.unwrap() == category.id)
-			.count() as i64;
+			.count() as u64;
 
 		category_dtos.push(CategoryDto {
 			id: category.id,

@@ -13,14 +13,16 @@ pub async fn login_form() -> Result<HttpResponse> {
 		.body(template.dyn_render().unwrap()))
 }
 
-pub async fn register_form() -> Result<HttpResponse> {
+#[allow(dead_code)]
+pub fn register_form() -> actix_web::HttpResponse {
 	let template = RegisterTemplate {};
 
-	Ok(HttpResponse::Ok()
+	HttpResponse::Ok()
 		.content_type("text/html")
-		.body(template.dyn_render().unwrap()))
+		.body(template.dyn_render().unwrap())
 }
 
+#[allow(dead_code)]
 pub async fn register(state: web::Data<AppState>, form: web::Form<RegisterDto>) -> Result<HttpResponse> {
 	let auth_service = &state.auth_service;
 
@@ -30,7 +32,7 @@ pub async fn register(state: web::Data<AppState>, form: web::Form<RegisterDto>) 
 		Ok(_) => Ok(HttpResponse::Found()
 			.append_header(("Location", "/auth/login"))
 			.finish()),
-		Err(e) => Ok(HttpResponse::BadRequest().body(format!("Registration failed: {}", e))),
+		Err(e) => Ok(HttpResponse::BadRequest().body(format!("Registration failed: {e}"))),
 	}
 }
 
@@ -47,7 +49,7 @@ pub async fn login(state: web::Data<AppState>, form: web::Form<LoginDto>) -> Res
 			// Set JWT token as a cookie
 			Ok(HttpResponse::Found()
 				.cookie(
-					actix_web::cookie::Cookie::build("auth_token", token.token.clone())
+					actix_web::cookie::Cookie::build("auth_token", token.token)
 						.http_only(true)
 						.same_site(actix_web::cookie::SameSite::Strict)
 						.path("/")
@@ -56,7 +58,7 @@ pub async fn login(state: web::Data<AppState>, form: web::Form<LoginDto>) -> Res
 				.append_header(("Location", "/"))
 				.finish())
 		},
-		Err(e) => Ok(HttpResponse::BadRequest().body(format!("Login failed: {}", e))),
+		Err(e) => Ok(HttpResponse::BadRequest().body(format!("Login failed: {e}"))),
 	}
 }
 

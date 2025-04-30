@@ -12,6 +12,9 @@ pub async fn list_transactions(
 	req: HttpRequest,
 	query: web::Query<TransactionFilterRequest>,
 ) -> Result<HttpResponse> {
+	let is_htmx_request = req.headers().contains_key("HX-Request");
+	drop(req);
+
 	let transaction_service = state.transaction_service.clone();
 	let stock_service = state.stock_item_service.clone();
 	let product_service = state.product_service.clone();
@@ -78,9 +81,6 @@ pub async fn list_transactions(
 			})
 		})
 		.collect();
-
-	// Check if this is an HTMX request
-	let is_htmx_request = req.headers().contains_key("HX-Request");
 
 	if is_htmx_request {
 		// Return just the table rows

@@ -59,10 +59,10 @@ where
 		let path = req.path().to_string();
 		for excluded_path in &self.exclude_paths {
 			if path.starts_with(excluded_path) {
-				let fut = self.service.call(req);
+				let future = self.service.call(req);
 				return Box::pin(async move {
-					let res = fut.await?;
-					Ok(res)
+					let response = future.await?;
+					Ok(response)
 				});
 			}
 		}
@@ -85,13 +85,9 @@ where
 				) {
 					Ok(token_data) => {
 						// Extract user info from token
-						let user_id = match Uuid::parse_str(&token_data.claims.sub) {
-							Ok(id) => id,
-							Err(_) => {
-								return Box::pin(async { Err(ErrorUnauthorized("Invalid token")) });
-							},
+						let Ok(user_id) = Uuid::parse_str(&token_data.claims.sub) else {
+							return Box::pin(async { Err(ErrorUnauthorized("Invalid token")) });
 						};
-
 						// Add user info to request extensions
 						req.extensions_mut().insert(user_id);
 
@@ -103,22 +99,20 @@ where
 						req.extensions_mut().insert(role);
 
 						// Continue with the request
-						let fut = self.service.call(req);
-						return Box::pin(async move {
-							let res = fut.await?;
-							Ok(res)
-						});
+						let future = self.service.call(req);
+						Box::pin(async move {
+							let response = future.await?;
+							Ok(response)
+						})
 					},
-					Err(_) => {
-						return Box::pin(async { Err(ErrorUnauthorized("Invalid token")) });
-					},
+					Err(_) => Box::pin(async { Err(ErrorUnauthorized("Invalid token")) }),
 				}
 			} else {
-				return Box::pin(async { Err(ErrorUnauthorized("Server configuration error")) });
+				Box::pin(async { Err(ErrorUnauthorized("Server configuration error")) })
 			}
 		} else {
 			// No token found, redirect to login
-			return Box::pin(async { Err(ErrorUnauthorized("Authentication required")) });
+			Box::pin(async { Err(ErrorUnauthorized("Authentication required")) })
 		}
 	}
 }

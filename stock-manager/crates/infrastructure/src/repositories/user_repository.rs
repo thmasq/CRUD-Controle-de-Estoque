@@ -113,8 +113,7 @@ impl UserRepository for DieselUserRepository {
 			.bind::<Text, _>(password_hash)
 			.load::<VerifyResult>(conn)?
 			.pop()
-			.map(|r| r.result)
-			.unwrap_or(false);
+			.is_some_and(|r| r.result);
 
 		Ok(result)
 	}

@@ -57,6 +57,7 @@ pub async fn list_products(
 	}
 
 	let is_htmx_request = req.headers().contains_key("HX-Request");
+	drop(req);
 
 	if is_htmx_request {
 		// Return just the table rows

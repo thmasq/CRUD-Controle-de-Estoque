@@ -72,10 +72,10 @@ pub async fn index(state: web::Data<AppState>) -> Result<HttpResponse> {
 
 	// Create template
 	let template = DashboardTemplate {
-		product_count: products.len() as i64,
-		category_count: categories.len() as i64,
-		warehouse_count: warehouses.len() as i64,
-		stock_item_count: stock_items.len() as i64,
+		product_count: products.len() as u64,
+		category_count: categories.len() as u64,
+		warehouse_count: warehouses.len() as u64,
+		stock_item_count: stock_items.len() as u64,
 		recent_transactions,
 		low_stock_items,
 	};

@@ -23,7 +23,7 @@ pub struct CategoryDto {
 	pub id: Uuid,
 	pub name: String,
 	pub description: Option<String>,
-	pub product_count: i64,
+	pub product_count: u64,
 }
 
 #[derive(Debug, Deserialize)]

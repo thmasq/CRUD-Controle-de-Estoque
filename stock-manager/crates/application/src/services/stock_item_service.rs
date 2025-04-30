@@ -63,24 +63,24 @@ impl StockItemService {
 				return Err(anyhow::anyhow!(
 					"Stock item for this product and warehouse already exists"
 				));
-			} else {
-				// Item exists but is marked as deleted - reactivate it with new values
-				let now = Utc::now();
-				let reactivated_item = StockItem {
-					id: existing_item.id,
-					product_id: existing_item.product_id,
-					warehouse_id: existing_item.warehouse_id,
-					quantity: dto.quantity,
-					unit_cost: dto.unit_cost,
-					last_restocked: now,
-					is_active: true, // Explicitly set to true for reactivation
-					created_at: existing_item.created_at,
-					updated_at: now,
-				};
-
-				// Update the item to reactivate it
-				return self.repository.update(reactivated_item).await;
 			}
+
+			// Item exists but is marked as deleted - reactivate it with new values
+			let now = Utc::now();
+			let reactivated_item = StockItem {
+				id: existing_item.id,
+				product_id: existing_item.product_id,
+				warehouse_id: existing_item.warehouse_id,
+				quantity: dto.quantity,
+				unit_cost: dto.unit_cost,
+				last_restocked: now,
+				is_active: true,
+				created_at: existing_item.created_at,
+				updated_at: now,
+			};
+
+			// Update the item to reactivate it
+			return self.repository.update(reactivated_item).await;
 		}
 
 		let now = Utc::now();

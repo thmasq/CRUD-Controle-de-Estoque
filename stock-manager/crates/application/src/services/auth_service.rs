@@ -51,7 +51,7 @@ impl AuthService {
 
 	pub async fn register(&self, dto: RegisterUserDto) -> anyhow::Result<User> {
 		// Check if username already exists
-		if let Some(_) = self.user_repository.find_by_username(&dto.username).await? {
+		if (self.user_repository.find_by_username(&dto.username).await?).is_some() {
 			return Err(anyhow::anyhow!("Username already exists"));
 		}
 

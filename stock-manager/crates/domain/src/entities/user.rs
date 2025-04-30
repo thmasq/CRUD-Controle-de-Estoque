@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum UserRole {
 	Seller,
 	Manager,
@@ -20,8 +20,8 @@ impl std::fmt::Display for UserRole {
 impl From<&str> for UserRole {
 	fn from(role: &str) -> Self {
 		match role.to_uppercase().as_str() {
-			"MANAGER" => UserRole::Manager,
-			_ => UserRole::Seller,
+			"MANAGER" => Self::Manager,
+			_ => Self::Seller,
 		}
 	}
 }
