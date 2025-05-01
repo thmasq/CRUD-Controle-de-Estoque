@@ -31,6 +31,7 @@ pub struct AppState {
 	transaction_service: Arc<StockTransactionService>,
 	auth_service: Arc<AuthService>,
 	jwt_secret: String,
+	enable_registration: bool, // Added to control registration functionality
 }
 
 #[actix_web::main]
@@ -38,6 +39,11 @@ async fn main() -> std::io::Result<()> {
 	dotenv().ok();
 
 	let jwt_secret = env::var("JWT_SECRET").unwrap_or_else(|_| "6561df437ac7ad6d26aaabc34dacb267".to_string());
+
+	// Check if registration is enabled (disabled by default)
+	let enable_registration = env::var("ENABLE_REGISTRATION")
+		.map(|val| val.to_lowercase() == "true")
+		.unwrap_or(false);
 
 	// Initialize tracing
 	tracing_subscriber::registry()
@@ -76,6 +82,7 @@ async fn main() -> std::io::Result<()> {
 		transaction_service,
 		auth_service,
 		jwt_secret,
+		enable_registration,
 	});
 
 	let host = env::var("HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
@@ -84,22 +91,22 @@ async fn main() -> std::io::Result<()> {
 
 	// Start HTTP server
 	let server = HttpServer::new(move || {
-		App::new()
+		// Create base application with authentication middleware
+		let mut app = App::new()
 			.wrap(actix_web::middleware::Logger::default())
 			.wrap(middleware::auth::Authentication {
 				exclude_paths: vec![
 					"/auth/login".to_string(),
 					"/auth/register".to_string(),
 					"/_static".to_string(),
+					"/".to_string(),
 				],
 			})
 			.app_data(app_state.clone())
 			.configure(static_assets::register)
 			// Auth routes
 			.route("/auth/login", web::get().to(handlers::auth::login_form))
-			// .route("/auth/register", web::get().to(handlers::auth::register_form))
 			.route("/auth/login", web::post().to(handlers::auth::login))
-			// .route("/auth/register", web::post().to(handlers::auth::register))
 			.route("/auth/logout", web::get().to(handlers::auth::logout))
 			// Dashboard
 			.route("/", web::get().to(handlers::dashboard::index))
@@ -173,7 +180,16 @@ async fn main() -> std::io::Result<()> {
 			.route(
 				"/transactions",
 				web::get().to(handlers::stock_transaction::list_transactions),
-			)
+			);
+
+		// Conditionally add registration routes if enabled
+		if app_state.enable_registration {
+			app = app
+				.route("/auth/register", web::get().to(handlers::auth::register_form))
+				.route("/auth/register", web::post().to(handlers::auth::register));
+		}
+
+		app
 	})
 	.bind(&bind_address)?
 	.run();

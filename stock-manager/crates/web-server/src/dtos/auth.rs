@@ -4,7 +4,9 @@ use stock_domain::entities::user::UserRole;
 
 #[derive(Template)]
 #[template(path = "auth/login.html")]
-pub struct LoginTemplate {}
+pub struct LoginTemplate {
+	pub enable_registration: bool,
+}
 
 #[derive(Template)]
 #[template(path = "auth/register.html")]

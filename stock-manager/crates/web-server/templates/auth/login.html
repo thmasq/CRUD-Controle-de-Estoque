@@ -25,7 +25,9 @@
     </form>
     
     <div class="mt-4 text-center">
+        {% if enable_registration %}
         <p class="text-sm text-gray-600">Don't have an account? <a href="/auth/register" class="text-indigo-600 hover:underline">Register</a></p>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

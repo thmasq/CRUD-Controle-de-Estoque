@@ -5,21 +5,23 @@ use stock_application::services::auth_service::Credentials;
 use crate::AppState;
 use crate::dtos::auth::{LoginDto, LoginTemplate, RegisterDto, RegisterTemplate};
 
-pub async fn login_form() -> Result<HttpResponse> {
-	let template = LoginTemplate {};
+pub async fn login_form(data: web::Data<AppState>) -> Result<HttpResponse> {
+	let template = LoginTemplate {
+		enable_registration: data.enable_registration,
+	};
 
 	Ok(HttpResponse::Ok()
 		.content_type("text/html")
 		.body(template.dyn_render().unwrap()))
 }
 
-#[allow(dead_code)]
-pub fn register_form() -> actix_web::HttpResponse {
+pub async fn register_form(data: web::Data<AppState>) -> Result<HttpResponse> {
+	let _ = data;
 	let template = RegisterTemplate {};
 
-	HttpResponse::Ok()
+	Ok(HttpResponse::Ok()
 		.content_type("text/html")
-		.body(template.dyn_render().unwrap())
+		.body(template.dyn_render().unwrap()))
 }
 
 #[allow(dead_code)]
@@ -49,26 +51,38 @@ pub async fn login(state: web::Data<AppState>, form: web::Form<LoginDto>) -> Res
 			// Set JWT token as a cookie
 			Ok(HttpResponse::Found()
 				.cookie(
-					actix_web::cookie::Cookie::build("auth_token", token.token)
+					actix_web::cookie::Cookie::build("auth_token", token.token.clone())
 						.http_only(true)
 						.same_site(actix_web::cookie::SameSite::Strict)
+						.path("/")
+						.finish(),
+				)
+				// Add username cookie for UI display
+				.cookie(
+					actix_web::cookie::Cookie::build("username", form.username.clone())
 						.path("/")
 						.finish(),
 				)
 				.append_header(("Location", "/"))
 				.finish())
 		},
-		Err(e) => Ok(HttpResponse::BadRequest().body(format!("Login failed: {e}"))),
+		Err(e) => Ok(HttpResponse::BadRequest().body(format!("Login failed: {}", e))),
 	}
 }
 
 pub async fn logout() -> Result<HttpResponse> {
-	// Clear the auth cookie
 	Ok(HttpResponse::Found()
 		.cookie(
 			actix_web::cookie::Cookie::build("auth_token", "")
 				.http_only(true)
 				.same_site(actix_web::cookie::SameSite::Strict)
+				.path("/")
+				.max_age(actix_web::cookie::time::Duration::seconds(-1))
+				.finish(),
+		)
+		// Also clear username cookie
+		.cookie(
+			actix_web::cookie::Cookie::build("username", "")
 				.path("/")
 				.max_age(actix_web::cookie::time::Duration::seconds(-1))
 				.finish(),

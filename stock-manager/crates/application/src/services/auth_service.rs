@@ -30,10 +30,11 @@ pub struct AuthTokenDto {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {
-	pub sub: String,  // Subject (User ID)
-	pub role: String, // Role
-	pub exp: i64,     // Expiration time
-	pub iat: i64,     // Issued at
+	pub sub: String,      // Subject (User ID)
+	pub username: String, // Username (new field)
+	pub role: String,     // Role
+	pub exp: i64,         // Expiration time
+	pub iat: i64,         // Issued at
 }
 
 pub struct AuthService {
@@ -119,6 +120,7 @@ impl AuthService {
 
 		let claims = Claims {
 			sub: user.id.to_string(),
+			username: user.username.clone(), // Include username
 			role: user.role.to_string(),
 			exp: expires_at.timestamp(),
 			iat: now.timestamp(),

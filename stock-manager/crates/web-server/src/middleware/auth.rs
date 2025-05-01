@@ -3,7 +3,7 @@ use actix_web::error::ErrorUnauthorized;
 use actix_web::{Error, HttpMessage, web};
 use futures_util::future::LocalBoxFuture;
 use jsonwebtoken::{DecodingKey, Validation, decode};
-use std::future::{Ready, ready};
+use std::future::{self, Ready, ready};
 use stock_application::services::auth_service::Claims;
 use stock_domain::entities::user::UserRole;
 use uuid::Uuid;
@@ -86,7 +86,9 @@ where
 					Ok(token_data) => {
 						// Extract user info from token
 						let Ok(user_id) = Uuid::parse_str(&token_data.claims.sub) else {
-							return Box::pin(async { Err(ErrorUnauthorized("Invalid token")) });
+							return Box::pin(future::ready(Err(actix_web::error::ErrorNotFound(
+								actix_web::http::Uri::from_static("/auth/login"),
+							))));
 						};
 						// Add user info to request extensions
 						req.extensions_mut().insert(user_id);
