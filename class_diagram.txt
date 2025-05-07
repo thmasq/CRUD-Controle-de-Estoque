@@ -1,108 +1,276 @@
+---
+config:
+  theme: neutral
+  layout: elk
+---
 classDiagram
-    %% Domain Models
+    class Category {
+        +Uuid id
+        +String name
+        +Option~String~ description
+        +DateTime~Utc~ created_at
+        +DateTime~Utc~ updated_at
+    }
     class Product {
         +Uuid id
         +String name
         +Option~String~ description
         +String sku
+        +Option~Uuid~ category_id
+        +bool is_active
         +DateTime~Utc~ created_at
         +DateTime~Utc~ updated_at
     }
-    
+    class Warehouse {
+        +Uuid id
+        +String name
+        +String location
+        +Option~String~ contact_info
+        +bool is_active
+        +DateTime~Utc~ created_at
+        +DateTime~Utc~ updated_at
+    }
     class StockItem {
         +Uuid id
         +Uuid product_id
+        +Uuid warehouse_id
         +i32 quantity
-        +String location
         +Decimal unit_cost
         +DateTime~Utc~ last_restocked
+        +bool is_active
+        +DateTime~Utc~ created_at
+        +DateTime~Utc~ updated_at
     }
-    
-    class DomainError {
+    class StockTransaction {
+        +Uuid id
+        +Uuid stock_item_id
+        +i32 quantity
+        +TransactionType transaction_type
+        +Option~String~ reference_number
+        +Option~String~ notes
+        +DateTime~Utc~ created_at
+        +String created_by
+    }
+    class TransactionType {
         <<enumeration>>
-        NotFound(String)
-        InvalidOperation(String)
-        InfrastructureError(String)
+        In
+        Out
+        Adjustment
+        +String to_string()
     }
-    
-    %% Repository Interfaces
+    class User {
+        +Uuid id
+        +String username
+        +String password_hash
+        +UserRole role
+        +DateTime~Utc~ created_at
+        +DateTime~Utc~ updated_at
+    }
+    class UserRole {
+        <<enumeration>>
+        Seller
+        Manager
+        +String to_string()
+    }
+    class CategoryRepository {
+        <<interface>>
+        +find_by_id(Uuid) -> Result~Option~Category~~
+        +find_all() -> Result~Vec~Category~~
+        +create(Category) -> Result~Category~
+        +update(Category) -> Result~Category~
+        +delete(Uuid) -> Result~bool~
+    }
     class ProductRepository {
         <<interface>>
-        +find_by_id(Uuid) DomainResult~Product~
-        +find_all() DomainResult~Vec~Product~~
-        +save(Product) DomainResult~Product~
-        +delete(Uuid) DomainResult~()~
+        +find_by_id(Uuid) -> Result~Option~Product~~
+        +find_by_sku(String) -> Result~Option~Product~~
+        +find_all() -> Result~Vec~Product~~
+        +find_by_category(Uuid) -> Result~Vec~Product~~
+        +create(Product) -> Result~Product~
+        +update(Product) -> Result~Product~
+        +delete(Uuid) -> Result~bool~
     }
-    
-    class StockRepository {
+    class WarehouseRepository {
         <<interface>>
-        +find_by_product_id(Uuid) DomainResult~Vec~StockItem~~
-        +update_quantity(Uuid, i32) DomainResult~StockItem~
-        +save(StockItem) DomainResult~StockItem~
+        +find_by_id(Uuid) -> Result~Option~Warehouse~~
+        +find_all() -> Result~Vec~Warehouse~~
+        +create(Warehouse) -> Result~Warehouse~
+        +update(Warehouse) -> Result~Warehouse~
+        +delete(Uuid) -> Result~bool~
     }
-    
-    %% Repository Implementations
-    class PostgresProductRepository {
-        -PgPool pool
-        +new(PgPool) PostgresProductRepository
-        +find_by_id(Uuid) DomainResult~Product~
-        +find_all() DomainResult~Vec~Product~~
-        +save(Product) DomainResult~Product~
-        +delete(Uuid) DomainResult~()~
+    class StockItemRepository {
+        <<interface>>
+        +find_by_id(Uuid) -> Result~Option~StockItem~~
+        +find_all() -> Result~Vec~StockItem~~
+        +find_by_product(Uuid) -> Result~Vec~StockItem~~
+        +find_by_warehouse(Uuid) -> Result~Vec~StockItem~~
+        +find_by_product_and_warehouse(Uuid, Uuid) -> Result~Option~StockItem~~
+        +create(StockItem) -> Result~StockItem~
+        +update(StockItem) -> Result~StockItem~
+        +delete(Uuid) -> Result~bool~
     }
-    
-    class PostgresStockRepository {
-        -PgPool pool
-        +new(PgPool) PostgresStockRepository
-        +find_by_product_id(Uuid) DomainResult~Vec~StockItem~~
-        +update_quantity(Uuid, i32) DomainResult~StockItem~
-        +save(StockItem) DomainResult~StockItem~
+    class StockTransactionRepository {
+        <<interface>>
+        +find_by_id(Uuid) -> Result~Option~StockTransaction~~
+        +find_all() -> Result~Vec~StockTransaction~~
+        +find_by_stock_item(Uuid) -> Result~Vec~StockTransaction~~
+        +find_by_type(TransactionType) -> Result~Vec~StockTransaction~~
+        +create(StockTransaction) -> Result~StockTransaction~
     }
-    
-    %% Application Services
-    class ProductService~P,S~ {
-        -P product_repo
-        -S stock_repo
-        +new(P, S) ProductService
-        +get_product(Uuid) DomainResult~Product~
-        +create_product(Product) DomainResult~Product~
-        +update_stock_quantity(Uuid, i32) DomainResult~StockItem~
+    class UserRepository {
+        <<interface>>
+        +find_by_id(Uuid) -> Result~Option~User~~
+        +find_by_username(String) -> Result~Option~User~~
+        +create(User) -> Result~User~
+        +update(User) -> Result~User~
+        +delete(Uuid) -> Result~bool~
+        +hash_password(String) -> Result~String~
+        +verify_password(String, String) -> Result~bool~
     }
-    
-    %% API/Interface Layer
-    class CreateProductRequest {
-        +String name
-        +Option~String~ description
-        +String sku
+    class CategoryService {
+        -Arc~dyn CategoryRepository~ repository
+        +get_category(Uuid) -> Result~Option~Category~~
+        +get_all_categories() -> Result~Vec~Category~~
+        +create_category(CategoryCreateDto) -> Result~Category~
+        +update_category(CategoryUpdateDto) -> Result~Category~
+        +delete_category(Uuid) -> Result~bool~
     }
-    
-    class ProductResponse {
-        +String id
-        +String name
-        +Option~String~ description
-        +String sku
+    class ProductService {
+        -Arc~dyn ProductRepository~ repository
+        +get_product(Uuid) -> Result~Option~Product~~
+        +get_product_by_sku(String) -> Result~Option~Product~~
+        +get_all_products() -> Result~Vec~Product~~
+        +get_products_by_category(Uuid) -> Result~Vec~Product~~
+        +create_product(ProductCreateDto) -> Result~Product~
+        +update_product(ProductUpdateDto) -> Result~Product~
+        +delete_product(Uuid) -> Result~bool~
     }
-    
-    class ProductController {
-        +get_product(ProductService, Uuid) Result~ProductResponse~
-        +get_products(ProductService) Result~Vec~ProductResponse~~
-        +create_product(ProductService, CreateProductRequest) Result~ProductResponse~
-        +update_product(ProductService, Uuid, CreateProductRequest) Result~ProductResponse~
-        +delete_product(ProductService, Uuid) Result~()~
+    class WarehouseService {
+        -Arc~dyn WarehouseRepository~ repository
+        +get_warehouse(Uuid) -> Result~Option~Warehouse~~
+        +get_all_warehouses() -> Result~Vec~Warehouse~~
+        +create_warehouse(WarehouseCreateDto) -> Result~Warehouse~
+        +update_warehouse(WarehouseUpdateDto) -> Result~Warehouse~
+        +delete_warehouse(Uuid) -> Result~bool~
     }
-    
-    %% Relationships
-    ProductRepository <|.. PostgresProductRepository : implements
-    StockRepository <|.. PostgresStockRepository : implements
-    
-    ProductService o-- ProductRepository : uses
-    ProductService o-- StockRepository : uses
-    
-    ProductController ..> ProductService : uses
-    ProductController ..> CreateProductRequest : uses
-    ProductController ..> ProductResponse : returns
-    
-    PostgresProductRepository ..> Product : manipulates
-    PostgresStockRepository ..> StockItem : manipulates
-    
-    Product <-- StockItem : references
+    class StockItemService {
+        -Arc~dyn StockItemRepository~ repository
+        +get_stock_item(Uuid) -> Result~Option~StockItem~~
+        +get_all_stock_items() -> Result~Vec~StockItem~~
+        +get_stock_items_by_product(Uuid) -> Result~Vec~StockItem~~
+        +get_stock_items_by_warehouse(Uuid) -> Result~Vec~StockItem~~
+        +create_stock_item(StockItemCreateDto) -> Result~StockItem~
+        +update_stock_item(StockItemUpdateDto) -> Result~StockItem~
+        +delete_stock_item(Uuid) -> Result~bool~
+    }
+    class StockTransactionService {
+        -Arc~dyn StockTransactionRepository~ transaction_repository
+        -Arc~dyn StockItemRepository~ stock_item_repository
+        +get_transaction(Uuid) -> Result~Option~StockTransaction~~
+        +get_all_transactions() -> Result~Vec~StockTransaction~~
+        +get_transactions_by_stock_item(Uuid) -> Result~Vec~StockTransaction~~
+        +create_transaction(StockTransactionCreateDto) -> Result~StockTransaction~
+    }
+    class AuthService {
+        -Arc~dyn UserRepository~ user_repository
+        -String jwt_secret
+        +register(RegisterUserDto) -> Result~User~
+        +login(Credentials) -> Result~AuthTokenDto~
+        +verify_token(String) -> Result~TokenData~Claims~~
+        -generate_token(User) -> Result~String~
+    }
+    class DieselCategoryRepository {
+        -Arc~PgPool~ pool
+        +impl CategoryRepository
+    }
+    class DieselProductRepository {
+        -Arc~PgPool~ pool
+        +impl ProductRepository
+    }
+    class DieselWarehouseRepository {
+        -Arc~PgPool~ pool
+        +impl WarehouseRepository
+    }
+    class DieselStockItemRepository {
+        -Arc~PgPool~ pool
+        +impl StockItemRepository
+    }
+    class DieselStockTransactionRepository {
+        -Arc~PgPool~ pool
+        +impl StockTransactionRepository
+    }
+    class DieselUserRepository {
+        -Arc~PgPool~ pool
+        +impl UserRepository
+    }
+    class CategoryHandler {
+        +list_categories()
+        +new_category_form()
+        +edit_category_form()
+        +create_category()
+        +update_category()
+        +delete_category()
+    }
+    class ProductHandler {
+        +list_products()
+        +new_product_form()
+        +edit_product_form()
+        +create_product()
+        +update_product()
+        +delete_product()
+    }
+    class WarehouseHandler {
+        +list_warehouses()
+        +new_warehouse_form()
+        +edit_warehouse_form()
+        +create_warehouse()
+        +update_warehouse()
+        +delete_warehouse()
+    }
+    class StockItemHandler {
+        +list_stock_items()
+        +new_stock_item_form()
+        +edit_stock_item_form()
+        +transaction_form()
+        +create_stock_item()
+        +update_stock_item()
+        +delete_stock_item()
+        +create_transaction()
+    }
+    class StockTransactionHandler {
+        +list_transactions()
+    }
+    class AuthHandler {
+        +login_form()
+        +register_form()
+        +login()
+        +register()
+        +logout()
+    }
+    Product --> Category : has category
+    StockItem --> Product : has product
+    StockItem --> Warehouse : stored in
+    StockTransaction --> StockItem : affects
+    StockTransaction --> TransactionType : has type
+    User --> UserRole : has role
+    CategoryService --> CategoryRepository : uses
+    ProductService --> ProductRepository : uses
+    WarehouseService --> WarehouseRepository : uses
+    StockItemService --> StockItemRepository : uses
+    StockTransactionService --> StockTransactionRepository : uses
+    StockTransactionService --> StockItemRepository : uses
+    AuthService --> UserRepository : uses
+    DieselCategoryRepository ..|> CategoryRepository : implements
+    DieselProductRepository ..|> ProductRepository : implements
+    DieselWarehouseRepository ..|> WarehouseRepository : implements
+    DieselStockItemRepository ..|> StockItemRepository : implements
+    DieselStockTransactionRepository ..|> StockTransactionRepository : implements
+    DieselUserRepository ..|> UserRepository : implements
+    CategoryHandler --> CategoryService : uses
+    ProductHandler --> ProductService : uses
+    WarehouseHandler --> WarehouseService : uses
+    StockItemHandler --> StockItemService : uses
+    StockItemHandler --> StockTransactionService : uses
+    StockTransactionHandler --> StockTransactionService : uses
+    AuthHandler --> AuthService : uses
+
