@@ -51,7 +51,7 @@ pub async fn login(state: web::Data<AppState>, form: web::Form<LoginDto>) -> Res
 			// Set JWT token as a cookie
 			Ok(HttpResponse::Found()
 				.cookie(
-					actix_web::cookie::Cookie::build("auth_token", token.token.clone())
+					actix_web::cookie::Cookie::build("auth_token", token.token)
 						.http_only(true)
 						.same_site(actix_web::cookie::SameSite::Strict)
 						.path("/")
@@ -66,7 +66,7 @@ pub async fn login(state: web::Data<AppState>, form: web::Form<LoginDto>) -> Res
 				.append_header(("Location", "/"))
 				.finish())
 		},
-		Err(e) => Ok(HttpResponse::BadRequest().body(format!("Login failed: {}", e))),
+		Err(e) => Ok(HttpResponse::BadRequest().body(format!("Login failed: {e}"))),
 	}
 }
 
