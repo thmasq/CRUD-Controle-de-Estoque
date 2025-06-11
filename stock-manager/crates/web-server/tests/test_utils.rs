@@ -68,6 +68,7 @@ impl TestClient {
 	}
 }
 
+#[allow(dead_code)]
 pub struct TestData {
 	pub categories: Vec<TestCategory>,
 	pub warehouses: Vec<TestWarehouse>,
@@ -100,6 +101,7 @@ pub struct TestProduct {
 	pub is_active: bool,
 }
 
+#[allow(dead_code)]
 impl TestData {
 	pub fn sample() -> Self {
 		Self {

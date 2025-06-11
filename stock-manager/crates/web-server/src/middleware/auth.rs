@@ -1,3 +1,4 @@
+use actix_web::body::EitherBody;
 use actix_web::dev::{Service, ServiceRequest, ServiceResponse, Transform, forward_ready};
 use actix_web::{Error, HttpMessage, HttpResponse, web};
 use futures_util::future::LocalBoxFuture;
@@ -22,7 +23,7 @@ where
 	S::Future: 'static,
 	B: 'static,
 {
-	type Response = ServiceResponse<B>;
+	type Response = ServiceResponse<EitherBody<B>>;
 	type Error = Error;
 	type InitError = ();
 	type Transform = AuthenticationMiddleware<S>;
@@ -48,7 +49,7 @@ where
 	S::Future: 'static,
 	B: 'static,
 {
-	type Response = ServiceResponse<B>;
+	type Response = ServiceResponse<EitherBody<B>>;
 	type Error = Error;
 	type Future = LocalBoxFuture<'static, Result<Self::Response, Self::Error>>;
 
@@ -62,7 +63,7 @@ where
 				let future = self.service.call(req);
 				return Box::pin(async move {
 					let response = future.await?;
-					Ok(response)
+					Ok(response.map_into_left_body())
 				});
 			}
 		}
@@ -95,7 +96,9 @@ where
 					Ok(token_data) => {
 						// Extract user info from token
 						let Ok(user_id) = Uuid::parse_str(&token_data.claims.sub) else {
-							return Box::pin(async move { Err(create_auth_error(is_htmx_request, is_ajax_request)) });
+							return Box::pin(
+								async move { Ok(create_auth_response(req, is_htmx_request, is_ajax_request)) },
+							);
 						};
 
 						// Add user info to request extensions
@@ -112,60 +115,55 @@ where
 						let future = self.service.call(req);
 						Box::pin(async move {
 							let response = future.await?;
-							Ok(response)
+							Ok(response.map_into_left_body())
 						})
 					},
 					Err(_) => {
-						// Invalid token - redirect to login
-						Box::pin(async move { Err(create_auth_error(is_htmx_request, is_ajax_request)) })
+						// Invalid token - return auth response
+						Box::pin(async move { Ok(create_auth_response(req, is_htmx_request, is_ajax_request)) })
 					},
 				}
 			} else {
-				// Server configuration error - redirect to login
-				Box::pin(async move { Err(create_auth_error(is_htmx_request, is_ajax_request)) })
+				// Server configuration error - return auth response
+				Box::pin(async move { Ok(create_auth_response(req, is_htmx_request, is_ajax_request)) })
 			}
 		} else {
-			// No token found - redirect to login
-			Box::pin(async move { Err(create_auth_error(is_htmx_request, is_ajax_request)) })
+			// No token found - return auth response
+			Box::pin(async move { Ok(create_auth_response(req, is_htmx_request, is_ajax_request)) })
 		}
 	}
 }
 
-fn create_auth_error(is_htmx_request: bool, is_ajax_request: bool) -> Error {
-	if is_htmx_request {
+fn create_auth_response<B>(
+	req: ServiceRequest,
+	is_htmx_request: bool,
+	is_ajax_request: bool,
+) -> ServiceResponse<EitherBody<B>> {
+	let response = if is_htmx_request {
 		// For HTMX requests, use HX-Redirect header to trigger client-side redirect
-		actix_web::error::InternalError::from_response(
-			"Authentication required",
-			HttpResponse::Unauthorized()
-				.insert_header(("HX-Redirect", "/auth/login"))
-				.insert_header(("Cache-Control", "no-cache, no-store, must-revalidate"))
-				.body("Authentication required"),
-		)
-		.into()
+		HttpResponse::Unauthorized()
+			.insert_header(("HX-Redirect", "/auth/login"))
+			.insert_header(("Cache-Control", "no-cache, no-store, must-revalidate"))
+			.body("Authentication required")
 	} else if is_ajax_request {
 		// For AJAX requests, return JSON response with redirect URL
-		actix_web::error::InternalError::from_response(
-			"Authentication required",
-			HttpResponse::Unauthorized()
-				.insert_header(("Content-Type", "application/json"))
-				.insert_header(("Cache-Control", "no-cache, no-store, must-revalidate"))
-				.json(serde_json::json!({
-					"error": "Authentication required",
-					"redirect": "/auth/login"
-				})),
-		)
-		.into()
+		HttpResponse::Unauthorized()
+			.insert_header(("Content-Type", "application/json"))
+			.insert_header(("Cache-Control", "no-cache, no-store, must-revalidate"))
+			.json(serde_json::json!({
+				"error": "Authentication required",
+				"redirect": "/auth/login"
+			}))
 	} else {
 		// For regular browser requests, return 302 redirect
-		actix_web::error::InternalError::from_response(
-			"Authentication required",
-			HttpResponse::Found()
-				.insert_header(("Location", "/auth/login"))
-				.insert_header(("Cache-Control", "no-cache, no-store, must-revalidate"))
-				.finish(),
-		)
-		.into()
-	}
+		HttpResponse::Found()
+			.insert_header(("Location", "/auth/login"))
+			.insert_header(("Cache-Control", "no-cache, no-store, must-revalidate"))
+			.finish()
+	};
+
+	let (http_req, _) = req.into_parts();
+	ServiceResponse::new(http_req, response).map_into_right_body()
 }
 
 #[cfg(test)]
