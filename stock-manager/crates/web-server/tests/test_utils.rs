@@ -8,6 +8,7 @@ pub struct TestClient {
 	pub username: Option<String>,
 }
 
+#[allow(dead_code)]
 impl TestClient {
 	pub fn new() -> Self {
 		Self {
@@ -73,12 +74,14 @@ pub struct TestData {
 	pub products: Vec<TestProduct>,
 }
 
+#[allow(dead_code)]
 pub struct TestCategory {
 	pub id: Option<Uuid>,
 	pub name: String,
 	pub description: Option<String>,
 }
 
+#[allow(dead_code)]
 pub struct TestWarehouse {
 	pub id: Option<Uuid>,
 	pub name: String,
@@ -87,6 +90,7 @@ pub struct TestWarehouse {
 	pub is_active: bool,
 }
 
+#[allow(dead_code)]
 pub struct TestProduct {
 	pub id: Option<Uuid>,
 	pub name: String,
@@ -149,22 +153,61 @@ impl TestData {
 	}
 }
 
+/// Properly encode form data for Actix Web tests
+#[allow(dead_code)]
 pub fn form_encode(data: &serde_json::Value) -> String {
 	let obj = data.as_object().unwrap();
 	obj.iter()
-		.map(|(k, v)| {
+		.filter_map(|(k, v)| {
+			// Skip null values
+			if v.is_null() {
+				return None;
+			}
+
 			let value = match v {
 				Value::String(s) => s.clone(),
 				Value::Bool(b) => b.to_string(),
 				Value::Number(n) => n.to_string(),
-				_ => v.to_string().trim_matches('"').to_string(),
+				_ => {
+					// Convert other types to string and remove quotes
+					let s = v.to_string();
+					if s.starts_with('"') && s.ends_with('"') {
+						s[1..s.len() - 1].to_string()
+					} else {
+						s
+					}
+				},
 			};
-			format!("{}={}", urlencoding::encode(k), urlencoding::encode(&value))
+			Some(format!("{}={}", urlencoding::encode(k), urlencoding::encode(&value)))
 		})
 		.collect::<Vec<_>>()
 		.join("&")
 }
 
+/// Convert JSON object to form-safe data by removing nulls and converting types
+#[allow(dead_code)]
+pub fn to_form_data(mut data: serde_json::Value) -> serde_json::Value {
+	if let Value::Object(ref mut map) = data {
+		// Remove null values and convert empty strings for optional fields
+		map.retain(|_, v| !v.is_null());
+
+		// Convert specific boolean values to strings for form handling
+		for (key, value) in map.iter_mut() {
+			match value {
+				Value::Bool(b) => {
+					*value = Value::String(b.to_string());
+				},
+				Value::String(s) if s.is_empty() && key.contains("description") => {
+					// Keep empty descriptions as empty strings
+				},
+				_ => {},
+			}
+		}
+	}
+	data
+}
+
+#[allow(dead_code)]
 pub async fn wait_for_response_with_timeout(
 	app: &impl actix_web::dev::Service<
 		actix_web::dev::ServiceRequest,
