@@ -38,7 +38,7 @@ pub struct Claims {
 }
 
 pub struct AuthService {
-	user_repository: Arc<dyn UserRepository>,
+	pub user_repository: Arc<dyn UserRepository>,
 	jwt_secret: String,
 }
 
