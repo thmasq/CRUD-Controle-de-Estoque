@@ -34,13 +34,13 @@ pub async fn list_transactions(
 	// Filter by date if specified
 	if let Some(ref date_str) = query.date {
 		// Only filter if date is not empty
-		if !date_str.is_empty() {
-			if let Ok(date) = NaiveDate::parse_from_str(date_str, "%Y-%m-%d") {
-				let start_of_day = Utc.from_utc_datetime(&date.and_hms_opt(0, 0, 0).unwrap());
-				let end_of_day = Utc.from_utc_datetime(&date.and_hms_opt(23, 59, 59).unwrap());
+		if !date_str.is_empty()
+			&& let Ok(date) = NaiveDate::parse_from_str(date_str, "%Y-%m-%d")
+		{
+			let start_of_day = Utc.from_utc_datetime(&date.and_hms_opt(0, 0, 0).unwrap());
+			let end_of_day = Utc.from_utc_datetime(&date.and_hms_opt(23, 59, 59).unwrap());
 
-				transactions.retain(|t| t.created_at >= start_of_day && t.created_at <= end_of_day);
-			}
+			transactions.retain(|t| t.created_at >= start_of_day && t.created_at <= end_of_day);
 		}
 	}
 

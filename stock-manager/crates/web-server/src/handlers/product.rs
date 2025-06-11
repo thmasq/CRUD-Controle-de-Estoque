@@ -185,10 +185,10 @@ pub async fn create_product(state: web::Data<AppState>, form: web::Form<ProductC
 		Ok(product) => {
 			// Get category name if needed
 			let mut category_name = None;
-			if let Some(category_id) = product.category_id {
-				if let Some(category) = state.category_service.get_category(category_id).await.unwrap_or(None) {
-					category_name = Some(category.name);
-				}
+			if let Some(category_id) = product.category_id
+				&& let Some(category) = state.category_service.get_category(category_id).await.unwrap_or(None)
+			{
+				category_name = Some(category.name);
 			}
 
 			// Return row HTML for the new product

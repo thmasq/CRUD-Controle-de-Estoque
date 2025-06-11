@@ -31,6 +31,7 @@ pub struct AppState {
 	pub enable_registration: bool,
 }
 
+#[must_use]
 pub fn create_app_state() -> web::Data<AppState> {
 	let jwt_secret = env::var("JWT_SECRET").unwrap_or_else(|_| "6561df437ac7ad6d26aaabc34dacb267".to_string());
 
@@ -49,7 +50,7 @@ pub fn create_app_state() -> web::Data<AppState> {
 	let warehouse_repo = Arc::new(DieselWarehouseRepository::new(pool.clone()));
 	let stock_item_repo = Arc::new(DieselStockItemRepository::new(pool.clone()));
 	let transaction_repo = Arc::new(DieselStockTransactionRepository::new(pool.clone()));
-	let user_repo = Arc::new(DieselUserRepository::new(pool.clone()));
+	let user_repo = Arc::new(DieselUserRepository::new(pool));
 
 	// Create services
 	let category_service = Arc::new(CategoryService::new(category_repo));

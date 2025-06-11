@@ -49,24 +49,23 @@ pub async fn index(state: web::Data<AppState>) -> Result<HttpResponse> {
 	let mut recent_transactions = Vec::new();
 	for transaction in transactions.iter().take(5) {
 		// Take most recent 5
-		if let Some(stock_item) = stock_items.iter().find(|si| si.id == transaction.stock_item_id) {
-			if let (Some(product), Some(warehouse)) = (
+		if let Some(stock_item) = stock_items.iter().find(|si| si.id == transaction.stock_item_id)
+			&& let (Some(product), Some(warehouse)) = (
 				product_map.get(&stock_item.product_id),
 				warehouse_map.get(&stock_item.warehouse_id),
 			) {
-				recent_transactions.push(crate::dtos::stock_transaction::TransactionDto {
-					id: transaction.id,
-					stock_item_id: transaction.stock_item_id,
-					product_name: product.name.clone(),
-					warehouse_name: warehouse.name.clone(),
-					quantity: transaction.quantity,
-					transaction_type: transaction.transaction_type.to_string(),
-					reference_number: transaction.reference_number.clone(),
-					notes: transaction.notes.clone(),
-					created_at: transaction.created_at,
-					created_by: transaction.created_by.clone(),
-				});
-			}
+			recent_transactions.push(crate::dtos::stock_transaction::TransactionDto {
+				id: transaction.id,
+				stock_item_id: transaction.stock_item_id,
+				product_name: product.name.clone(),
+				warehouse_name: warehouse.name.clone(),
+				quantity: transaction.quantity,
+				transaction_type: transaction.transaction_type.to_string(),
+				reference_number: transaction.reference_number.clone(),
+				notes: transaction.notes.clone(),
+				created_at: transaction.created_at,
+				created_by: transaction.created_by.clone(),
+			});
 		}
 	}
 
