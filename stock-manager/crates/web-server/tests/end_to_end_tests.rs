@@ -1,3 +1,4 @@
+use actix_web::body::EitherBody;
 use actix_web::http::StatusCode;
 use actix_web::test;
 use serde_json::json;
@@ -70,7 +71,7 @@ impl TestContext {
 		impl actix_web::dev::ServiceFactory<
 			actix_web::dev::ServiceRequest,
 			Config = (),
-			Response = actix_web::dev::ServiceResponse,
+			Response = actix_web::dev::ServiceResponse<EitherBody<actix_web::body::BoxBody>>,
 			Error = actix_web::Error,
 			InitError = (),
 		> + use<>,
