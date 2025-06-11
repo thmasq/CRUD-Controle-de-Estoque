@@ -48,6 +48,12 @@ impl UserRepository for DieselUserRepository {
 		Ok(result.map(Into::into))
 	}
 
+	async fn find_all(&self) -> anyhow::Result<Vec<User>> {
+		let conn = &mut self.pool.get()?;
+		let result = users::table.select(UserModel::as_select()).load(conn)?;
+		Ok(result.into_iter().map(Into::into).collect())
+	}
+
 	async fn create(&self, user: User) -> anyhow::Result<User> {
 		let conn = &mut self.pool.get()?;
 
