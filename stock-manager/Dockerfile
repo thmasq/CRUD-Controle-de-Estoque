@@ -1,5 +1,5 @@
 # Stage 1: Build the application
-FROM rust:latest AS builder
+FROM rustlang/rust:nightly AS builder
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -12,8 +12,7 @@ WORKDIR /usr/src/stock-manager
 # Copy project files
 COPY . .
 
-# Build the project
-RUN cargo build --release
+RUN cargo +nightly build --release
 
 # Stage 2: Create the runtime image
 FROM debian:bookworm-slim
