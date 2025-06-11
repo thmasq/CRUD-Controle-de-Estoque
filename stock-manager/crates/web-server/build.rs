@@ -27,7 +27,7 @@ fn main() {
 
 	let force = env::var("FORCE_DOWNLOAD").is_ok();
 
-	for (url, filename) in files.iter() {
+	for (url, filename) in &files {
 		let path: PathBuf = static_dir.join(filename);
 
 		if force || !path.exists() {
@@ -36,13 +36,13 @@ fn main() {
 			let content = client
 				.get(*url)
 				.send()
-				.and_then(|res| res.error_for_status())
-				.expect(&format!("Failed to download {}", filename))
+				.and_then(reqwest::blocking::Response::error_for_status)
+				.unwrap_or_else(|_| panic!("Failed to download {filename}"))
 				.bytes()
-				.expect(&format!("Failed to read {} response body", filename));
+				.unwrap_or_else(|_| panic!("Failed to read {filename} response body"));
 
-			fs::write(&path, &content).expect(&format!("Failed to write {}", filename));
-			println!("cargo:warning={} downloaded successfully", filename);
+			fs::write(&path, &content).unwrap_or_else(|_| panic!("Failed to write {filename}"));
+			println!("cargo:warning={filename} downloaded successfully");
 		}
 
 		println!("cargo:rerun-if-changed={}", path.display());
