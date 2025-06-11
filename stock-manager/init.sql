@@ -1,3 +1,5 @@
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 CREATE TABLE categories (
   id UUID PRIMARY KEY,
   name VARCHAR(100) NOT NULL UNIQUE,
@@ -53,8 +55,33 @@ CREATE TABLE stock_transactions (
   created_by VARCHAR(100) NOT NULL
 );
 
+CREATE TABLE users (
+  id UUID PRIMARY KEY,
+  username VARCHAR(100) NOT NULL UNIQUE,
+  password_hash VARCHAR(255) NOT NULL,
+  role VARCHAR(20) NOT NULL DEFAULT 'SELLER',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE INDEX idx_products_category ON products(category_id);
 CREATE INDEX idx_stock_items_product ON stock_items(product_id);
 CREATE INDEX idx_stock_items_warehouse ON stock_items(warehouse_id);
 CREATE INDEX idx_stock_transactions_stock_item ON stock_transactions(stock_item_id);
 CREATE INDEX idx_stock_transactions_created_at ON stock_transactions(created_at);
+CREATE INDEX idx_users_username ON users(username);
+
+CREATE OR REPLACE FUNCTION hash_password(password TEXT)
+RETURNS TEXT AS $$
+BEGIN
+  RETURN crypt(password, gen_salt('bf'));
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION verify_password(password TEXT, hash TEXT)
+RETURNS BOOLEAN AS $$
+BEGIN
+  RETURN hash = crypt(password, hash);
+END;
+$$ LANGUAGE plpgsql;
+
