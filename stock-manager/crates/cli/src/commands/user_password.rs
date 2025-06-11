@@ -2,7 +2,7 @@ use anyhow::{Result, anyhow};
 use chrono::Utc;
 
 use crate::CliContext;
-use crate::utils::*;
+use crate::utils::{confirm_action, find_user_by_identifier, print_info, print_success, prompt_password};
 
 pub async fn execute(
 	ctx: &CliContext,
@@ -10,7 +10,7 @@ pub async fn execute(
 	new_password: Option<String>,
 	skip_confirmation: bool,
 ) -> Result<()> {
-	print_info(&format!("Looking up user '{}'...", identifier));
+	print_info(&format!("Looking up user '{identifier}'..."));
 
 	let mut user = find_user_by_identifier(ctx, identifier)
 		.await?
@@ -19,7 +19,7 @@ pub async fn execute(
 	println!("\nUser:");
 	println!("  ID: {}", user.id);
 	println!("  Username: {}", user.username);
-	println!("  Role: {}", user.role.to_string());
+	println!("  Role: {}", user.role);
 
 	// Get the new password
 	let password = match new_password {

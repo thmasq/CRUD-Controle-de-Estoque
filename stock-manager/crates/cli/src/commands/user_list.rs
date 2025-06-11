@@ -1,7 +1,7 @@
 use anyhow::Result;
 
 use crate::CliContext;
-use crate::utils::*;
+use crate::utils::{format_user_output, print_info, print_success, print_warning};
 
 pub async fn execute(ctx: &CliContext, format: &str) -> Result<()> {
 	print_info("Fetching users...");
@@ -14,7 +14,7 @@ pub async fn execute(ctx: &CliContext, format: &str) -> Result<()> {
 	}
 
 	let output = format_user_output(&users, format)?;
-	println!("{}", output);
+	println!("{output}");
 
 	print_success(&format!("Found {} user(s)", users.len()));
 

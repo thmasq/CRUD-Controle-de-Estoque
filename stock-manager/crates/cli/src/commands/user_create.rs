@@ -2,7 +2,9 @@ use anyhow::{Result, anyhow};
 use stock_application::services::auth_service::RegisterUserDto;
 
 use crate::CliContext;
-use crate::utils::*;
+use crate::utils::{
+	confirm_action, format_single_user_output, parse_user_role, print_info, print_success, prompt_password,
+};
 
 pub async fn execute(
 	ctx: &CliContext,
@@ -21,7 +23,7 @@ pub async fn execute(
 	}
 
 	// Check if user already exists
-	if let Some(_) = ctx.auth_service.user_repository.find_by_username(username).await? {
+	if (ctx.auth_service.user_repository.find_by_username(username).await?).is_some() {
 		return Err(anyhow!("User '{}' already exists", username));
 	}
 
@@ -43,7 +45,7 @@ pub async fn execute(
 	};
 
 	// Confirm action
-	let confirmation_message = format!("Create user '{}' with role '{}'?", username, user_role.to_string());
+	let confirmation_message = format!("Create user '{username}' with role '{user_role}'?");
 
 	if !confirm_action(&confirmation_message, skip_confirmation)? {
 		print_info("Operation cancelled");
@@ -69,7 +71,7 @@ pub async fn execute(
 	// Display created user details
 	println!("\nUser Details:");
 	let output = format_single_user_output(&created_user, "table")?;
-	println!("{}", output);
+	println!("{output}");
 
 	Ok(())
 }

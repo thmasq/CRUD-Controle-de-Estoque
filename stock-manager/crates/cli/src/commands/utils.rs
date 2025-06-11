@@ -115,17 +115,17 @@ pub fn format_single_user_output(user: &User, format: &str) -> Result<String> {
 }
 
 pub fn print_success(message: &str) {
-	println!("✅ {}", message);
+	println!("✅ {message}");
 }
 
 pub fn print_error(message: &str) {
-	eprintln!("❌ Error: {}", message);
+	eprintln!("❌ Error: {message}");
 }
 
 pub fn print_warning(message: &str) {
-	println!("⚠️  Warning: {}", message);
+	println!("⚠️  Warning: {message}");
 }
 
 pub fn print_info(message: &str) {
-	println!("ℹ️  {}", message);
+	println!("ℹ️  {message}");
 }

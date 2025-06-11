@@ -2,7 +2,10 @@ use anyhow::{Result, anyhow};
 use chrono::Utc;
 
 use crate::CliContext;
-use crate::utils::*;
+use crate::utils::{
+	confirm_action, find_user_by_identifier, format_single_user_output, parse_user_role, print_info, print_success,
+	prompt_password,
+};
 
 pub async fn execute(
 	ctx: &CliContext,
@@ -12,7 +15,7 @@ pub async fn execute(
 	new_role: Option<String>,
 	skip_confirmation: bool,
 ) -> Result<()> {
-	print_info(&format!("Looking up user '{}'...", identifier));
+	print_info(&format!("Looking up user '{identifier}'..."));
 
 	let user = find_user_by_identifier(ctx, identifier)
 		.await?
@@ -31,7 +34,7 @@ pub async fn execute(
 		}
 		if username != &user.username {
 			// Check if username already exists
-			if let Some(_) = ctx.auth_service.user_repository.find_by_username(username).await? {
+			if (ctx.auth_service.user_repository.find_by_username(username).await?).is_some() {
 				return Err(anyhow!("Username '{}' already exists", username));
 			}
 			changes.push(format!("username: '{}' -> '{}'", user.username, username));
@@ -43,7 +46,7 @@ pub async fn execute(
 	if let Some(ref role_str) = new_role {
 		let role = parse_user_role(role_str)?;
 		if role != user.role {
-			changes.push(format!("role: '{}' -> '{}'", user.role.to_string(), role.to_string()));
+			changes.push(format!("role: '{}' -> '{}'", user.role, role));
 			updated_user.role = role;
 		}
 	}
@@ -84,7 +87,7 @@ pub async fn execute(
 	// Show changes
 	println!("\nChanges to be made:");
 	for change in &changes {
-		println!("  • {}", change);
+		println!("  • {change}");
 	}
 
 	// Confirm action
@@ -106,7 +109,7 @@ pub async fn execute(
 	// Display updated user details
 	println!("\nUpdated User Details:");
 	let output = format_single_user_output(&updated_user, "table")?;
-	println!("{}", output);
+	println!("{output}");
 
 	Ok(())
 }

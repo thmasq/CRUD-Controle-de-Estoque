@@ -1,10 +1,10 @@
 use anyhow::{Result, anyhow};
 
 use crate::CliContext;
-use crate::utils::*;
+use crate::utils::{confirm_action, find_user_by_identifier, format_single_user_output, print_info, print_success};
 
 pub async fn execute(ctx: &CliContext, identifier: &str, skip_confirmation: bool) -> Result<()> {
-	print_info(&format!("Looking up user '{}'...", identifier));
+	print_info(&format!("Looking up user '{identifier}'..."));
 
 	let user = find_user_by_identifier(ctx, identifier)
 		.await?
@@ -12,7 +12,7 @@ pub async fn execute(ctx: &CliContext, identifier: &str, skip_confirmation: bool
 
 	println!("\nUser to be deleted:");
 	let output = format_single_user_output(&user, "table")?;
-	println!("{}", output);
+	println!("{output}");
 
 	// Confirm deletion
 	let confirmation_message = format!(
