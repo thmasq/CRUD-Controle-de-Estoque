@@ -51,10 +51,62 @@ jobs:
           cp stock-manager/init.sql /tmp/init.sql
           PGPASSWORD=postgres psql -h localhost -U postgres -d stockmanager_test -f /tmp/init.sql
 
-      - name: Run tests
-        run: cargo test --manifest-path stock-manager/Cargo.toml
+      - name: Add password hashing functions to test database
+        run: |
+          PGPASSWORD=postgres psql -h localhost -U postgres -d stockmanager_test -c "
+          CREATE EXTENSION IF NOT EXISTS pgcrypto;
+          
+          CREATE OR REPLACE FUNCTION hash_password(password TEXT)
+          RETURNS TEXT AS \$\$
+          BEGIN
+            RETURN crypt(password, gen_salt('bf'));
+          END;
+          \$\$ LANGUAGE plpgsql;
+          
+          CREATE OR REPLACE FUNCTION verify_password(password TEXT, hash TEXT)
+          RETURNS BOOLEAN AS \$\$
+          BEGIN
+            RETURN hash = crypt(password, hash);
+          END;
+          \$\$ LANGUAGE plpgsql;
+          
+          CREATE TABLE IF NOT EXISTS users (
+            id UUID PRIMARY KEY,
+            username VARCHAR(100) NOT NULL UNIQUE,
+            password_hash VARCHAR(255) NOT NULL,
+            role VARCHAR(20) NOT NULL DEFAULT 'SELLER',
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+          );
+          "
+
+      - name: Run unit tests
+        run: cargo test --manifest-path stock-manager/Cargo.toml --lib
         env:
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/stockmanager_test
+
+      - name: Run integration tests
+        run: cargo test --manifest-path stock-manager/Cargo.toml --test integration_tests
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/stockmanager_test
+          JWT_SECRET: test_jwt_secret_for_ci
+          ENABLE_REGISTRATION: true
+          RUST_LOG: debug
+
+      - name: Run end-to-end tests
+        run: cargo test --manifest-path stock-manager/Cargo.toml --test end_to_end_tests
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/stockmanager_test
+          JWT_SECRET: test_jwt_secret_for_ci
+          ENABLE_REGISTRATION: true
+          RUST_LOG: debug
+
+      - name: Run database tests
+        run: cargo test --manifest-path stock-manager/Cargo.toml --test database_tests
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/stockmanager_test
+          JWT_SECRET: test_jwt_secret_for_ci
+          RUST_LOG: debug
 
   lint:
     name: Lint with Nightly
@@ -82,3 +134,100 @@ jobs:
 
       - name: Check with clippy
         run: cargo +nightly clippy --manifest-path stock-manager/Cargo.toml -- -D warnings
+
+  integration-test-full:
+    name: Full Integration Test with Fresh Database
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_DB: stockmanager_integration
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-integration-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Set up fresh PostgreSQL database
+        run: |
+          # Copy and execute init script
+          cp stock-manager/init.sql /tmp/init.sql
+          PGPASSWORD=postgres psql -h localhost -p 5433 -U postgres -d stockmanager_integration -f /tmp/init.sql
+          
+          # Add required functions for authentication
+          PGPASSWORD=postgres psql -h localhost -p 5433 -U postgres -d stockmanager_integration -c "
+          CREATE EXTENSION IF NOT EXISTS pgcrypto;
+          
+          CREATE OR REPLACE FUNCTION hash_password(password TEXT)
+          RETURNS TEXT AS \$\$
+          BEGIN
+            RETURN crypt(password, gen_salt('bf'));
+          END;
+          \$\$ LANGUAGE plpgsql;
+          
+          CREATE OR REPLACE FUNCTION verify_password(password TEXT, hash TEXT)
+          RETURNS BOOLEAN AS \$\$
+          BEGIN
+            RETURN hash = crypt(password, hash);
+          END;
+          \$\$ LANGUAGE plpgsql;
+          
+          CREATE TABLE IF NOT EXISTS users (
+            id UUID PRIMARY KEY,
+            username VARCHAR(100) NOT NULL UNIQUE,
+            password_hash VARCHAR(255) NOT NULL,
+            role VARCHAR(20) NOT NULL DEFAULT 'SELLER',
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+          );
+          "
+
+      - name: Run comprehensive integration test suite
+        run: |
+          # Run all integration tests with verbose output
+          cargo test --manifest-path stock-manager/Cargo.toml \
+            --test integration_tests \
+            --test end_to_end_tests \
+            --test database_tests \
+            -- --test-threads=1 --nocapture
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5433/stockmanager_integration
+          JWT_SECRET: integration_test_secret_key
+          ENABLE_REGISTRATION: true
+          RUST_LOG: info
+          HOST: 127.0.0.1
+          PORT: 0  # Let the system choose an available port
+
+      - name: Verify database state after tests
+        run: |
+          echo "Checking final database state..."
+          PGPASSWORD=postgres psql -h localhost -p 5433 -U postgres -d stockmanager_integration -c "
+          SELECT 'Categories: ' || COUNT(*) FROM categories;
+          SELECT 'Products: ' || COUNT(*) FROM products;
+          SELECT 'Warehouses: ' || COUNT(*) FROM warehouses;
+          SELECT 'Stock Items: ' || COUNT(*) FROM stock_items;
+          SELECT 'Transactions: ' || COUNT(*) FROM stock_transactions;
+          SELECT 'Users: ' || COUNT(*) FROM users;
+          "
+
