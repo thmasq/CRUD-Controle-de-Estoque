@@ -3,8 +3,24 @@ name: CI
 on:
   push:
     branches: ["master"]
+    paths:
+      - 'stock-manager/crates/**'
+      - 'stock-manager/Cargo.toml'
+      - 'stock-manager/rust-toolchain.toml'
+      - 'stock-manager/rustfmt.toml'
+      - 'stock-manager/init.sql'
+      - 'stock-manager/Dockerfile*'
+      - '.github/workflows/ci.yml'
   pull_request:
     branches: ["master"]
+    paths:
+      - 'stock-manager/crates/**'
+      - 'stock-manager/Cargo.toml'
+      - 'stock-manager/rust-toolchain.toml'
+      - 'stock-manager/rustfmt.toml'
+      - 'stock-manager/init.sql'
+      - 'stock-manager/Dockerfile*'
+      - '.github/workflows/ci.yml'
 
 env:
   CARGO_TERM_COLOR: always
@@ -230,4 +246,3 @@ jobs:
           SELECT 'Transactions: ' || COUNT(*) FROM stock_transactions;
           SELECT 'Users: ' || COUNT(*) FROM users;
           "
-
