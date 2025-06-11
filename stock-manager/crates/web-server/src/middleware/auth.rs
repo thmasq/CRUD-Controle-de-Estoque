@@ -1,9 +1,9 @@
 use actix_web::dev::{Service, ServiceRequest, ServiceResponse, Transform, forward_ready};
-use actix_web::error::ErrorUnauthorized;
-use actix_web::{Error, HttpMessage, web};
+use actix_web::{Error, HttpMessage, HttpResponse, web};
 use futures_util::future::LocalBoxFuture;
 use jsonwebtoken::{DecodingKey, Validation, decode};
-use std::future::{self, Ready, ready};
+use serde_json;
+use std::future::{Ready, ready};
 use stock_application::services::auth_service::Claims;
 use stock_domain::entities::user::UserRole;
 use uuid::Uuid;
@@ -74,6 +74,15 @@ where
 		let auth_cookie = req.cookie("auth_token");
 		let auth_token = auth_cookie.map(|c| c.value().to_string());
 
+		// Check if this is an HTMX request
+		let is_htmx_request = req.headers().get("HX-Request").is_some();
+
+		// Check if this is an AJAX request
+		let is_ajax_request = req
+			.headers()
+			.get("X-Requested-With")
+			.is_some_and(|v| v.to_str().unwrap_or("") == "XMLHttpRequest");
+
 		// Process based on token
 		if let Some(token) = auth_token {
 			if let Some(app_state) = app_state {
@@ -86,10 +95,11 @@ where
 					Ok(token_data) => {
 						// Extract user info from token
 						let Ok(user_id) = Uuid::parse_str(&token_data.claims.sub) else {
-							return Box::pin(future::ready(Err(actix_web::error::ErrorNotFound(
-								actix_web::http::Uri::from_static("/auth/login"),
-							))));
+							return Box::pin(
+								async move { Err(create_redirect_error(is_htmx_request, is_ajax_request)) },
+							);
 						};
+
 						// Add user info to request extensions
 						req.extensions_mut().insert(user_id);
 
@@ -107,14 +117,126 @@ where
 							Ok(response)
 						})
 					},
-					Err(_) => Box::pin(async { Err(ErrorUnauthorized("Invalid token")) }),
+					Err(_) => {
+						// Invalid token - redirect to login
+						Box::pin(async move { Err(create_redirect_error(is_htmx_request, is_ajax_request)) })
+					},
 				}
 			} else {
-				Box::pin(async { Err(ErrorUnauthorized("Server configuration error")) })
+				// Server configuration error - redirect to login
+				Box::pin(async move { Err(create_redirect_error(is_htmx_request, is_ajax_request)) })
 			}
 		} else {
-			// No token found, redirect to login
-			Box::pin(async { Err(ErrorUnauthorized("Authentication required")) })
+			// No token found - redirect to login
+			Box::pin(async move { Err(create_redirect_error(is_htmx_request, is_ajax_request)) })
 		}
+	}
+}
+
+/// Creates an appropriate redirect error based on the request type
+fn create_redirect_error(is_htmx_request: bool, is_ajax_request: bool) -> Error {
+	if is_htmx_request {
+		// For HTMX requests, use HX-Redirect header to trigger client-side redirect
+		actix_web::error::InternalError::from_response(
+			"Authentication required",
+			HttpResponse::Unauthorized()
+				.insert_header(("HX-Redirect", "/auth/login"))
+				.insert_header(("Cache-Control", "no-cache, no-store, must-revalidate"))
+				.body("Authentication required"),
+		)
+		.into()
+	} else if is_ajax_request {
+		// For AJAX requests, return JSON response with redirect URL
+		actix_web::error::InternalError::from_response(
+			"Authentication required",
+			HttpResponse::Unauthorized()
+				.insert_header(("Content-Type", "application/json"))
+				.insert_header(("Cache-Control", "no-cache, no-store, must-revalidate"))
+				.json(serde_json::json!({
+					"error": "Authentication required",
+					"redirect": "/auth/login"
+				})),
+		)
+		.into()
+	} else {
+		// For regular browser requests, return 302 redirect
+		actix_web::error::InternalError::from_response(
+			"Authentication required",
+			HttpResponse::Found()
+				.insert_header(("Location", "/auth/login"))
+				.insert_header(("Cache-Control", "no-cache, no-store, must-revalidate"))
+				.finish(),
+		)
+		.into()
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use actix_web::{App, HttpResponse, test, web};
+
+	async fn protected_handler() -> HttpResponse {
+		HttpResponse::Ok().body("Protected")
+	}
+
+	#[actix_web::test]
+	async fn test_redirect_for_regular_request() {
+		let app = test::init_service(
+			App::new()
+				.wrap(Authentication {
+					exclude_paths: vec!["/auth/login".to_string()],
+				})
+				.route("/protected", web::get().to(protected_handler)),
+		)
+		.await;
+
+		let req = test::TestRequest::get().uri("/protected").to_request();
+		let resp = test::call_service(&app, req).await;
+
+		assert_eq!(resp.status(), actix_web::http::StatusCode::FOUND);
+		assert_eq!(resp.headers().get("Location").unwrap(), "/auth/login");
+	}
+
+	#[actix_web::test]
+	async fn test_htmx_redirect() {
+		let app = test::init_service(
+			App::new()
+				.wrap(Authentication {
+					exclude_paths: vec!["/auth/login".to_string()],
+				})
+				.route("/protected", web::get().to(protected_handler)),
+		)
+		.await;
+
+		let req = test::TestRequest::get()
+			.uri("/protected")
+			.insert_header(("HX-Request", "true"))
+			.to_request();
+		let resp = test::call_service(&app, req).await;
+
+		assert_eq!(resp.status(), actix_web::http::StatusCode::UNAUTHORIZED);
+		assert_eq!(resp.headers().get("HX-Redirect").unwrap(), "/auth/login");
+	}
+
+	#[actix_web::test]
+	async fn test_ajax_redirect() {
+		let app = test::init_service(
+			App::new()
+				.wrap(Authentication {
+					exclude_paths: vec!["/auth/login".to_string()],
+				})
+				.route("/protected", web::get().to(protected_handler)),
+		)
+		.await;
+
+		let req = test::TestRequest::get()
+			.uri("/protected")
+			.insert_header(("X-Requested-With", "XMLHttpRequest"))
+			.to_request();
+		let resp = test::call_service(&app, req).await;
+
+		assert_eq!(resp.status(), actix_web::http::StatusCode::UNAUTHORIZED);
+		assert_eq!(resp.headers().get("Content-Type").unwrap(), "application/json");
 	}
 }

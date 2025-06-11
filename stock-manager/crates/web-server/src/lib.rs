@@ -183,7 +183,6 @@ pub async fn run_server() -> std::io::Result<()> {
 					"/auth/login".to_string(),
 					"/auth/register".to_string(),
 					"/_static".to_string(),
-					"/".to_string(),
 				],
 			})
 			.app_data(app_state.clone())
