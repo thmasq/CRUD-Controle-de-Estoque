@@ -228,8 +228,13 @@ async fn test_category_crud() {
 	let resp = test::call_service(&app, req).await;
 	assert_eq!(resp.status(), StatusCode::OK);
 
+	let timestamp = std::time::SystemTime::now()
+		.duration_since(std::time::UNIX_EPOCH)
+		.unwrap()
+		.as_millis();
+
 	let category_data = to_form_data(json!({
-		"name": "Electronics",
+		"name": format!("Electronics_{}", timestamp),
 		"description": "Electronic products"
 	}));
 
@@ -240,23 +245,10 @@ async fn test_category_crud() {
 		.to_request();
 	let resp = test::call_service(&app, req).await;
 
-	// Check for both success and error cases
-	if !resp.status().is_success() {
-		// pull out status before moving resp
-		let status = resp.status();
-		let body = test::read_body(resp).await;
-		let body_str = std::str::from_utf8(&body).unwrap();
-		println!("Category creation failed: Status={}, Body={}", status, body_str);
-
-		// If it's a duplicate error, that's acceptable in tests
-		if body_str.contains("already exists") {
-			println!("Category already exists, continuing test...");
-		} else {
-			panic!("Unexpected category creation failure: {}", body_str);
-		}
-	} else {
-		assert!(resp.status().is_success());
-	}
+	assert!(
+		resp.status().is_success(),
+		"Category creation should succeed with unique name"
+	);
 
 	// Test get category form
 	let req = ctx
@@ -320,8 +312,13 @@ async fn test_warehouse_crud() {
 	let resp = test::call_service(&app, req).await;
 	assert_eq!(resp.status(), StatusCode::OK);
 
+	let timestamp = std::time::SystemTime::now()
+		.duration_since(std::time::UNIX_EPOCH)
+		.unwrap()
+		.as_millis();
+
 	let warehouse_data = to_form_data(json!({
-		"name": "Main Warehouse",
+		"name": format!("Main_Warehouse_{}", timestamp),
 		"location": "123 Main St",
 		"contact_info": "contact@example.com",
 		"is_active": true
@@ -334,23 +331,10 @@ async fn test_warehouse_crud() {
 		.to_request();
 	let resp = test::call_service(&app, req).await;
 
-	// Check for both success and error cases
-	if !resp.status().is_success() {
-		// pull out status before moving resp
-		let status = resp.status();
-		let body = test::read_body(resp).await;
-		let body_str = std::str::from_utf8(&body).unwrap();
-		println!("Warehouse creation failed: Status={}, Body={}", status, body_str);
-
-		// If it's a duplicate error, that's acceptable in tests
-		if body_str.contains("already exists") {
-			println!("Warehouse already exists, continuing test...");
-		} else {
-			panic!("Unexpected warehouse creation failure: {}", body_str);
-		}
-	} else {
-		assert!(resp.status().is_success());
-	}
+	assert!(
+		resp.status().is_success(),
+		"Warehouse creation should succeed with unique name"
+	);
 
 	// Test get warehouse form
 	let req = ctx
