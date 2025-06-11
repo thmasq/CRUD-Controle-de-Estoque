@@ -23,12 +23,14 @@ services:
       context: .
       dockerfile: Dockerfile
     environment:
-      DATABASE_URL: postgres://postgres:postgres@db:5432/stockmanager
-      RUST_LOG: stock_web_server=debug,actix_web=info
-      HOST: 0.0.0.0
-      PORT: 8080
+      DATABASE_URL: ${DATABASE_URL:-postgres://postgres:postgres@db:5432/stockmanager}
+      RUST_LOG: ${RUST_LOG:-stock_web_server=debug,actix_web=info}
+      HOST: ${HOST:-0.0.0.0}
+      PORT: ${PORT:-8080}
+      JWT_SECRET: ${JWT_SECRET:-your_secret_key_here}
+      ENABLE_REGISTRATION: ${ENABLE_REGISTRATION:-false}
     ports:
-      - "8080:8080"
+      - "${PORT:-8080}:8080"
     networks:
       - stock-network
     depends_on:
