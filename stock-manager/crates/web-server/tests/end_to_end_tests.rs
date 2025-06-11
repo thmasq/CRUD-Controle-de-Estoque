@@ -83,7 +83,6 @@ impl TestContext {
 					"/auth/login".to_string(),
 					"/auth/register".to_string(),
 					"/_static".to_string(),
-					"/".to_string(),
 				],
 			})
 			.app_data(self.app_state.clone())
