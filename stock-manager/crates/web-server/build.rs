@@ -6,7 +6,7 @@ use std::{env, fs};
 fn main() {
 	let files = [
 		("https://unpkg.com/htmx.org@2.0.4", "htmx.min.js"),
-		("https://cdn.tailwindcss.com", "tailwind.min.js"),
+		("https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4", "tailwind.min.js"),
 	];
 
 	let static_dir = Path::new("static");
