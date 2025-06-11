@@ -170,6 +170,22 @@ impl TestContext {
 	}
 }
 
+fn create_form_data(data: serde_json::Value) -> serde_json::Value {
+	if let serde_json::Value::Object(mut map) = data {
+		// Remove null values to avoid serialization issues
+		map.retain(|_, v| !v.is_null());
+		// Convert remaining None values to empty strings if needed
+		for (_, v) in map.iter_mut() {
+			if v.is_null() {
+				*v = serde_json::Value::String("".to_string());
+			}
+		}
+		serde_json::Value::Object(map)
+	} else {
+		data
+	}
+}
+
 #[actix_web::test]
 async fn test_complete_stock_management_workflow() {
 	let mut ctx = TestContext::new().await;
@@ -180,10 +196,10 @@ async fn test_complete_stock_management_workflow() {
 
 	// Step 1: Create categories
 	for category in &mut test_data.categories {
-		let category_data = json!({
+		let category_data = create_form_data(json!({
 			"name": category.name,
 			"description": category.description
-		});
+		}));
 
 		let req = ctx
 			.add_auth_cookie(test::TestRequest::post().uri("/categories"))
@@ -201,12 +217,12 @@ async fn test_complete_stock_management_workflow() {
 
 	// Step 2: Create warehouses
 	for warehouse in &mut test_data.warehouses {
-		let warehouse_data = json!({
+		let warehouse_data = create_form_data(json!({
 			"name": warehouse.name,
 			"location": warehouse.location,
 			"contact_info": warehouse.contact_info,
 			"is_active": warehouse.is_active
-		});
+		}));
 
 		let req = ctx
 			.add_auth_cookie(test::TestRequest::post().uri("/warehouses"))
@@ -224,12 +240,12 @@ async fn test_complete_stock_management_workflow() {
 
 	// Step 3: Create products
 	for product in &mut test_data.products {
-		let product_data = json!({
+		let product_data = create_form_data(json!({
 			"name": product.name,
 			"description": product.description,
 			"sku": product.sku,
 			"is_active": product.is_active
-		});
+		}));
 
 		let req = ctx
 			.add_auth_cookie(test::TestRequest::post().uri("/products"))
