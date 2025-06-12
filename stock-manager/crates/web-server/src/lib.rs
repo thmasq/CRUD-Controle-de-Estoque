@@ -9,8 +9,11 @@ pub mod dtos;
 pub mod filters;
 pub mod handlers;
 pub mod middleware;
+pub mod services;
 pub mod static_assets;
 
+use services::notification_listener::NotificationListener;
+use services::token_blacklist::TokenBlacklistService;
 use stock_application::{CategoryService, ProductService, StockItemService, StockTransactionService, WarehouseService};
 use stock_infrastructure::db::establish_connection_pool;
 use stock_infrastructure::repositories::category_repository::DieselCategoryRepository;
@@ -18,6 +21,7 @@ use stock_infrastructure::repositories::product_repository::DieselProductReposit
 use stock_infrastructure::repositories::stock_item_repository::DieselStockItemRepository;
 use stock_infrastructure::repositories::stock_transaction_repository::DieselStockTransactionRepository;
 use stock_infrastructure::repositories::warehouse_repository::DieselWarehouseRepository;
+use tokio::pin;
 
 // Application state that holds all services
 pub struct AppState {
@@ -27,6 +31,7 @@ pub struct AppState {
 	pub stock_item_service: Arc<StockItemService>,
 	pub transaction_service: Arc<StockTransactionService>,
 	pub auth_service: Arc<AuthService>,
+	pub blacklist_service: Arc<TokenBlacklistService>,
 	pub jwt_secret: String,
 	pub enable_registration: bool,
 }
@@ -60,6 +65,9 @@ pub fn create_app_state() -> web::Data<AppState> {
 	let transaction_service = Arc::new(StockTransactionService::new(transaction_repo, stock_item_repo));
 	let auth_service = Arc::new(AuthService::new(user_repo, jwt_secret.clone()));
 
+	// Create token blacklist service
+	let blacklist_service = Arc::new(TokenBlacklistService::new());
+
 	// Create app state
 	web::Data::new(AppState {
 		category_service,
@@ -68,6 +76,7 @@ pub fn create_app_state() -> web::Data<AppState> {
 		stock_item_service,
 		transaction_service,
 		auth_service,
+		blacklist_service,
 		jwt_secret,
 		enable_registration,
 	})
@@ -170,6 +179,17 @@ pub async fn run_server() -> std::io::Result<()> {
 
 	let app_state = create_app_state();
 
+	// Start the notification listener as a background task
+	let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+
+	let notification_listener = NotificationListener::new(app_state.blacklist_service.clone(), database_url);
+
+	let listener_handle: tokio::task::JoinHandle<()> = tokio::spawn(async move {
+		if let Err(e) = notification_listener.start().await {
+			tracing::error!("Notification listener failed: {}", e);
+		}
+	});
+
 	let host = env::var("HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
 	let port = env::var("PORT").unwrap_or_else(|_| "8080".to_string());
 	let bind_address = format!("{host}:{port}");
@@ -200,5 +220,21 @@ pub async fn run_server() -> std::io::Result<()> {
 	.run();
 
 	println!("Server running at http://{bind_address}");
-	server.await
+
+	pin!(listener_handle);
+
+	tokio::select! {
+		result = server => {
+			tracing::info!("HTTP server stopped");
+			listener_handle.abort();
+			result
+		}
+		result = &mut listener_handle => {
+			match result {
+				Ok(()) => tracing::info!("Notification listener stopped"),
+				Err(e) => tracing::error!("Notification listener task error: {}", e),
+			}
+			Ok(())
+		}
+	}
 }

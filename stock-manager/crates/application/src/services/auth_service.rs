@@ -23,6 +23,7 @@ pub struct RegisterUserDto {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AuthTokenDto {
 	pub token: String,
+	pub jti: String,
 	pub user_id: Uuid,
 	pub role: UserRole,
 	pub expires_at: i64,
@@ -31,10 +32,11 @@ pub struct AuthTokenDto {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {
 	pub sub: String,      // Subject (User ID)
-	pub username: String, // Username (new field)
+	pub username: String, // Username
 	pub role: String,     // Role
 	pub exp: i64,         // Expiration time
 	pub iat: i64,         // Issued at
+	pub jti: String,      // JWT ID
 }
 
 pub struct AuthService {
@@ -89,8 +91,8 @@ impl AuthService {
 			return Err(anyhow::anyhow!("Invalid credentials"));
 		}
 
-		// Generate JWT token
-		let token = self.generate_token(&user)?;
+		// Generate JWT token with JTI
+		let (token, jti) = self.generate_token(&user)?;
 
 		// Get expiration time (e.g., 24 hours from now)
 		let now = Utc::now();
@@ -98,6 +100,7 @@ impl AuthService {
 
 		Ok(AuthTokenDto {
 			token,
+			jti,
 			user_id: user.id,
 			role: user.role,
 			expires_at: expiration.timestamp(),
@@ -114,16 +117,18 @@ impl AuthService {
 		Ok(token_data)
 	}
 
-	fn generate_token(&self, user: &User) -> anyhow::Result<String> {
+	fn generate_token(&self, user: &User) -> anyhow::Result<(String, String)> {
 		let now = Utc::now();
 		let expires_at = now + Duration::hours(24);
+		let jti = Uuid::new_v4().to_string();
 
 		let claims = Claims {
 			sub: user.id.to_string(),
-			username: user.username.clone(), // Include username
+			username: user.username.clone(),
 			role: user.role.to_string(),
 			exp: expires_at.timestamp(),
 			iat: now.timestamp(),
+			jti: jti.clone(),
 		};
 
 		let token = encode(
@@ -132,6 +137,6 @@ impl AuthService {
 			&EncodingKey::from_secret(self.jwt_secret.as_bytes()),
 		)?;
 
-		Ok(token)
+		Ok((token, jti))
 	}
 }

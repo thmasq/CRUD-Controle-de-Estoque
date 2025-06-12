@@ -1,6 +1,7 @@
 use actix_web::body::EitherBody;
 use actix_web::dev::{Service, ServiceRequest, ServiceResponse, Transform, forward_ready};
 use actix_web::{Error, HttpMessage, HttpResponse, web};
+use chrono::{DateTime, Utc};
 use futures_util::future::LocalBoxFuture;
 use jsonwebtoken::{DecodingKey, Validation, decode};
 use serde_json;
@@ -10,6 +11,7 @@ use stock_domain::entities::user::UserRole;
 use uuid::Uuid;
 
 use crate::AppState;
+use crate::services::token_blacklist::TokenInfo;
 
 // Define a struct to hold our authentication configuration
 pub struct Authentication {
@@ -68,7 +70,7 @@ where
 			}
 		}
 
-		// Get application state to access JWT secret
+		// Get application state to access JWT secret and blacklist service
 		let app_state = req.app_data::<web::Data<AppState>>().cloned();
 
 		// Extract token from cookie
@@ -94,12 +96,29 @@ where
 					&Validation::default(),
 				) {
 					Ok(token_data) => {
+						// Check if token is blacklisted
+						if app_state.blacklist_service.is_token_revoked(&token_data.claims.jti) {
+							tracing::warn!("Attempted use of revoked token with JTI: {}", token_data.claims.jti);
+							return Box::pin(
+								async move { Ok(create_auth_response(req, is_htmx_request, is_ajax_request)) },
+							);
+						}
+
 						// Extract user info from token
 						let Ok(user_id) = Uuid::parse_str(&token_data.claims.sub) else {
 							return Box::pin(
 								async move { Ok(create_auth_response(req, is_htmx_request, is_ajax_request)) },
 							);
 						};
+
+						// Register token in blacklist service if not already known
+						// This helps track active tokens for revocation
+						let token_info = TokenInfo {
+							jti: token_data.claims.jti.clone(),
+							user_id,
+							expires_at: DateTime::from_timestamp(token_data.claims.exp, 0).unwrap_or_else(Utc::now),
+						};
+						app_state.blacklist_service.register_token(token_info);
 
 						// Add user info to request extensions
 						req.extensions_mut().insert(user_id);
@@ -111,6 +130,9 @@ where
 						};
 						req.extensions_mut().insert(role);
 
+						// Add JTI to request extensions for potential future use
+						req.extensions_mut().insert(token_data.claims.jti);
+
 						// Continue with the request
 						let future = self.service.call(req);
 						Box::pin(async move {
@@ -118,13 +140,15 @@ where
 							Ok(response.map_into_left_body())
 						})
 					},
-					Err(_) => {
-						// Invalid token - return auth response
+					Err(e) => {
+						// Invalid token - log the error and return auth response
+						tracing::warn!("Invalid JWT token: {}", e);
 						Box::pin(async move { Ok(create_auth_response(req, is_htmx_request, is_ajax_request)) })
 					},
 				}
 			} else {
 				// Server configuration error - return auth response
+				tracing::error!("Missing AppState in authentication middleware");
 				Box::pin(async move { Ok(create_auth_response(req, is_htmx_request, is_ajax_request)) })
 			}
 		} else {

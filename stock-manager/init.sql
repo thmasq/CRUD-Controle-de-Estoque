@@ -85,3 +85,22 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+CREATE OR REPLACE FUNCTION notify_user_deleted()
+RETURNS TRIGGER AS $$
+BEGIN
+  PERFORM pg_notify(
+    'user_deleted', 
+    json_build_object(
+      'user_id', OLD.id::text,
+      'username', OLD.username,
+      'deleted_at', now()::text
+    )::text
+  );
+  RETURN OLD;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER user_deleted_trigger
+  AFTER DELETE ON users
+  FOR EACH ROW
+  EXECUTE FUNCTION notify_user_deleted();
