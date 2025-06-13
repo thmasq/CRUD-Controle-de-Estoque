@@ -46,6 +46,7 @@ impl TestContext {
 		let stock_item_service = Arc::new(StockItemService::new(stock_item_repo.clone()));
 		let transaction_service = Arc::new(StockTransactionService::new(transaction_repo, stock_item_repo));
 		let auth_service = Arc::new(AuthService::new(user_repo, "test_secret".to_string()));
+		let blacklist_service = Arc::new(stock_web_server::services::token_blacklist::TokenBlacklistService::new());
 
 		let app_state = web::Data::new(AppState {
 			category_service,
@@ -54,6 +55,7 @@ impl TestContext {
 			stock_item_service,
 			transaction_service,
 			auth_service,
+			blacklist_service,
 			jwt_secret: "test_secret".to_string(),
 			enable_registration: true,
 		});
