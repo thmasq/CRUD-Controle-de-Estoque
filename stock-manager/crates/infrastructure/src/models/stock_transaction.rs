@@ -34,11 +34,12 @@ pub struct NewStockTransactionModel {
 
 impl From<StockTransactionModel> for StockTransaction {
 	fn from(model: StockTransactionModel) -> Self {
+		#[allow(clippy::match_same_arms)]
 		let transaction_type = match model.transaction_type.as_str() {
 			"IN" => TransactionType::In,
 			"OUT" => TransactionType::Out,
 			"ADJUSTMENT" => TransactionType::Adjustment,
-			_ => TransactionType::Adjustment, // Default fallback
+			_ => TransactionType::Adjustment,
 		};
 
 		Self {

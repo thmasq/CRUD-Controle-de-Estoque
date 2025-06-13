@@ -138,7 +138,7 @@ pub async fn logout(req: HttpRequest, state: web::Data<AppState>) -> Result<Http
 }
 
 // Admin endpoint to get token statistics (useful for monitoring)
-pub async fn token_stats(req: HttpRequest, state: web::Data<AppState>) -> Result<HttpResponse> {
+pub fn token_stats(req: HttpRequest, state: web::Data<AppState>) -> Result<HttpResponse> {
 	// Check if user is a manager (this would typically be done via middleware)
 	let is_manager = req
 		.extensions()
@@ -163,7 +163,7 @@ pub async fn token_stats(req: HttpRequest, state: web::Data<AppState>) -> Result
 }
 
 // Admin endpoint to force token cleanup
-pub async fn force_cleanup(req: HttpRequest, state: web::Data<AppState>) -> Result<HttpResponse> {
+pub fn force_cleanup(req: HttpRequest, state: web::Data<AppState>) -> Result<HttpResponse> {
 	// Check if user is a manager
 	let is_manager = req
 		.extensions()
@@ -204,7 +204,7 @@ pub async fn force_cleanup(req: HttpRequest, state: web::Data<AppState>) -> Resu
 }
 
 // Admin endpoint to revoke all tokens for a specific user
-pub async fn revoke_user_tokens(
+pub fn revoke_user_tokens(
 	req: HttpRequest,
 	path: web::Path<uuid::Uuid>,
 	state: web::Data<AppState>,
@@ -367,13 +367,13 @@ mod tests {
 
 		// Test without manager role
 		let req = test::TestRequest::get().to_http_request();
-		let response = token_stats(req, app_state.clone()).await.unwrap();
+		let response = token_stats(req, app_state.clone()).unwrap();
 		assert_eq!(response.status(), actix_web::http::StatusCode::FORBIDDEN);
 
 		// Test with manager role
 		let req = test::TestRequest::get().to_http_request();
 		req.extensions_mut().insert(UserRole::Manager);
-		let response = token_stats(req, app_state).await.unwrap();
+		let response = token_stats(req, app_state).unwrap();
 		assert_eq!(response.status(), actix_web::http::StatusCode::OK);
 	}
 }

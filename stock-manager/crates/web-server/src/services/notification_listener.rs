@@ -96,7 +96,7 @@ impl NotificationListener {
 
 						if notification.channel() == "user_deleted"
 							&& let Err(e) =
-								Self::handle_user_deleted_notification(&blacklist_service, notification.payload()).await
+								Self::handle_user_deleted_notification(&blacklist_service, notification.payload())
 						{
 							error!("Error handling user_deleted notification: {}", e);
 						}
@@ -158,7 +158,7 @@ impl NotificationListener {
 		Ok(())
 	}
 
-	async fn handle_user_deleted_notification(
+	fn handle_user_deleted_notification(
 		blacklist_service: &TokenBlacklistService,
 		payload: &str,
 	) -> anyhow::Result<()> {
@@ -230,9 +230,7 @@ mod tests {
 			user_id
 		);
 
-		NotificationListener::handle_user_deleted_notification(&blacklist_service, &payload)
-			.await
-			.unwrap();
+		NotificationListener::handle_user_deleted_notification(&blacklist_service, &payload).unwrap();
 
 		// Verify all tokens were revoked
 		let stats_after = blacklist_service.get_stats();
@@ -250,13 +248,13 @@ mod tests {
 		let blacklist_service = Arc::new(TokenBlacklistService::new());
 
 		// Test with invalid JSON
-		let result = NotificationListener::handle_user_deleted_notification(&blacklist_service, "invalid json").await;
+		let result = NotificationListener::handle_user_deleted_notification(&blacklist_service, "invalid json");
 		assert!(result.is_err());
 		assert!(result.unwrap_err().to_string().contains("Failed to parse"));
 
 		// Test with invalid UUID
 		let payload = r#"{"user_id":"invalid-uuid","username":"testuser","deleted_at":"2024-01-01T12:00:00Z"}"#;
-		let result = NotificationListener::handle_user_deleted_notification(&blacklist_service, payload).await;
+		let result = NotificationListener::handle_user_deleted_notification(&blacklist_service, payload);
 		assert!(result.is_err());
 		assert!(result.unwrap_err().to_string().contains("Invalid user_id"));
 	}
@@ -272,7 +270,7 @@ mod tests {
 		);
 
 		// Should not fail even if user has no tokens
-		let result = NotificationListener::handle_user_deleted_notification(&blacklist_service, &payload).await;
+		let result = NotificationListener::handle_user_deleted_notification(&blacklist_service, &payload);
 		assert!(result.is_ok());
 
 		// Should report 0 tokens revoked
