@@ -7,7 +7,31 @@ use tracing::{debug, info, warn};
 use crate::AppState;
 use crate::dtos::auth::{LoginDto, LoginTemplate, RegisterDto, RegisterTemplate};
 
-pub async fn login_form(data: web::Data<AppState>) -> Result<HttpResponse> {
+pub async fn login_form(req: HttpRequest, data: web::Data<AppState>) -> Result<HttpResponse> {
+	// Check if user is already authenticated
+	if let Some(auth_cookie) = req.cookie("auth_token") {
+		let token = auth_cookie.value();
+
+		// Verify the token is still valid
+		match decode::<Claims>(
+			token,
+			&DecodingKey::from_secret(data.jwt_secret.as_bytes()),
+			&Validation::default(),
+		) {
+			Ok(token_data) => {
+				// Check if token is not expired and not revoked
+				let now = chrono::Utc::now().timestamp();
+				if token_data.claims.exp > now && !data.blacklist_service.is_token_revoked(&token_data.claims.jti) {
+					// User is already authenticated, redirect to dashboard
+					return Ok(HttpResponse::Found().append_header(("Location", "/")).finish());
+				}
+			},
+			Err(_) => {
+				// Invalid token, continue to show login form
+			},
+		}
+	}
+
 	let template = LoginTemplate {
 		enable_registration: data.enable_registration,
 	};
@@ -68,7 +92,14 @@ pub async fn login(state: web::Data<AppState>, form: web::Form<LoginDto>) -> Res
 						.max_age(actix_web::cookie::time::Duration::seconds(3600)) // 1 hour
 						.finish(),
 				)
-				// Add username cookie for UI display (also 1 hour)
+				.cookie(
+					actix_web::cookie::Cookie::build("authenticated", "true")
+						.http_only(false)
+						.same_site(actix_web::cookie::SameSite::Strict)
+						.path("/")
+						.max_age(actix_web::cookie::time::Duration::seconds(3600)) // 1 hour
+						.finish(),
+				)
 				.cookie(
 					actix_web::cookie::Cookie::build("username", form.username.clone())
 						.path("/")
@@ -116,11 +147,19 @@ pub async fn logout(req: HttpRequest, state: web::Data<AppState>) -> Result<Http
 		}
 	}
 
-	// Clear the auth cookies and redirect
+	// Clear all auth cookies and redirect
 	Ok(HttpResponse::Found()
 		.cookie(
 			actix_web::cookie::Cookie::build("auth_token", "")
 				.http_only(true)
+				.same_site(actix_web::cookie::SameSite::Strict)
+				.path("/")
+				.max_age(actix_web::cookie::time::Duration::seconds(-1))
+				.finish(),
+		)
+		.cookie(
+			actix_web::cookie::Cookie::build("authenticated", "")
+				.http_only(false)
 				.same_site(actix_web::cookie::SameSite::Strict)
 				.path("/")
 				.max_age(actix_web::cookie::time::Duration::seconds(-1))
@@ -291,7 +330,8 @@ mod tests {
 	#[actix_web::test]
 	async fn test_login_form() {
 		let app_state = create_test_app_state();
-		let response = login_form(app_state).await.unwrap();
+		let req = test::TestRequest::get().to_http_request();
+		let response = login_form(req, app_state).await.unwrap();
 		assert_eq!(response.status(), actix_web::http::StatusCode::OK);
 	}
 
