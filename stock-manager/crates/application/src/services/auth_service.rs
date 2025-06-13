@@ -2,6 +2,7 @@ use chrono::{Duration, Utc};
 use jsonwebtoken::{DecodingKey, EncodingKey, Header, TokenData, Validation, decode, encode};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 use stock_domain::entities::user::{User, UserRole};
@@ -53,50 +54,95 @@ impl AuthService {
 	}
 
 	pub async fn register(&self, dto: RegisterUserDto) -> anyhow::Result<User> {
+		debug!("Attempting to register user: {}", dto.username);
+
 		// Check if username already exists
 		if (self.user_repository.find_by_username(&dto.username).await?).is_some() {
+			warn!("Registration failed: username '{}' already exists", dto.username);
 			return Err(anyhow::anyhow!("Username already exists"));
 		}
 
 		// Hash the password using repository method
-		let hashed_password = self.user_repository.hash_password(&dto.password).await?;
+		let hashed_password = self.user_repository.hash_password(&dto.password).await.map_err(|e| {
+			error!("Password hashing failed for user '{}': {}", dto.username, e);
+			anyhow::anyhow!("Password hashing failed: {}", e)
+		})?;
 
 		let now = Utc::now();
 		let user = User {
 			id: Uuid::new_v4(),
-			username: dto.username,
+			username: dto.username.clone(),
 			password_hash: hashed_password,
 			role: dto.role,
 			created_at: now,
 			updated_at: now,
 		};
 
-		self.user_repository.create(user).await
+		let created_user = self.user_repository.create(user).await.map_err(|e| {
+			error!("User creation failed for '{}': {}", dto.username, e);
+			anyhow::anyhow!("User creation failed: {}", e)
+		})?;
+
+		info!(
+			"User '{}' registered successfully with ID: {}",
+			created_user.username, created_user.id
+		);
+		Ok(created_user)
 	}
 
 	pub async fn login(&self, credentials: Credentials) -> anyhow::Result<AuthTokenDto> {
+		debug!("Login attempt for user: {}", credentials.username);
+
+		// Find user by username
 		let user = self
 			.user_repository
 			.find_by_username(&credentials.username)
-			.await?
-			.ok_or_else(|| anyhow::anyhow!("Invalid credentials"))?;
+			.await
+			.map_err(|e| {
+				error!(
+					"Database error during user lookup for '{}': {}",
+					credentials.username, e
+				);
+				anyhow::anyhow!("Database error during authentication")
+			})?
+			.ok_or_else(|| {
+				warn!("Login failed: user '{}' not found", credentials.username);
+				anyhow::anyhow!("Invalid credentials")
+			})?;
+
+		debug!("User '{}' found in database, verifying password", credentials.username);
 
 		// Use repository method to verify password
 		let is_valid = self
 			.user_repository
 			.verify_password(&credentials.password, &user.password_hash)
-			.await?;
+			.await
+			.map_err(|e| {
+				error!("Password verification error for user '{}': {}", credentials.username, e);
+				anyhow::anyhow!("Password verification failed")
+			})?;
 
 		if !is_valid {
+			warn!("Login failed: invalid password for user '{}'", credentials.username);
 			return Err(anyhow::anyhow!("Invalid credentials"));
 		}
 
+		debug!("Password verified successfully for user '{}'", credentials.username);
+
 		// Generate JWT token with JTI
-		let (token, jti) = self.generate_token(&user)?;
+		let (token, jti) = self.generate_token(&user).map_err(|e| {
+			error!("Token generation failed for user '{}': {}", credentials.username, e);
+			anyhow::anyhow!("Token generation failed")
+		})?;
 
 		// Get expiration time (1 hour from now)
 		let now = Utc::now();
 		let expiration = now + Duration::hours(1);
+
+		info!(
+			"Login successful for user '{}' (ID: {}), JTI: {}",
+			user.username, user.id, jti
+		);
 
 		Ok(AuthTokenDto {
 			token,
@@ -118,6 +164,8 @@ impl AuthService {
 	}
 
 	pub async fn refresh_token(&self, user_id: Uuid) -> anyhow::Result<AuthTokenDto> {
+		debug!("Refreshing token for user ID: {}", user_id);
+
 		let user = self
 			.user_repository
 			.find_by_id(user_id)
@@ -128,6 +176,8 @@ impl AuthService {
 
 		let now = Utc::now();
 		let expiration = now + Duration::hours(1);
+
+		debug!("Token refreshed for user '{}', new JTI: {}", user.username, jti);
 
 		Ok(AuthTokenDto {
 			token,
@@ -142,6 +192,11 @@ impl AuthService {
 		let now = Utc::now();
 		let expires_at = now + Duration::hours(1);
 		let jti = Uuid::new_v4().to_string();
+
+		debug!(
+			"Generating new token from existing claims for user '{}', new JTI: {}",
+			claims.username, jti
+		);
 
 		let new_claims = Claims {
 			sub: claims.sub.clone(),
@@ -165,6 +220,11 @@ impl AuthService {
 		let now = Utc::now();
 		let expires_at = now + Duration::hours(1);
 		let jti = Uuid::new_v4().to_string();
+
+		debug!(
+			"Generating token for user '{}' (ID: {}), JTI: {}",
+			user.username, user.id, jti
+		);
 
 		let claims = Claims {
 			sub: user.id.to_string(),

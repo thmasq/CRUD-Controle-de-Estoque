@@ -162,13 +162,16 @@ where
 								},
 							}
 						} else {
-							let token_info = TokenInfo {
-								jti: token_data.claims.jti.clone(),
-								user_id,
-								expires_at: DateTime::from_timestamp(token_data.claims.exp, 0)
-									.unwrap_or_else(|| Utc::now() + chrono::Duration::hours(1)),
-							};
-							app_state.blacklist_service.register_token(token_info);
+							if !app_state.blacklist_service.is_token_registered(&token_data.claims.jti) {
+								let token_info = TokenInfo {
+									jti: token_data.claims.jti.clone(),
+									user_id,
+									expires_at: DateTime::from_timestamp(token_data.claims.exp, 0)
+										.unwrap_or_else(|| Utc::now() + chrono::Duration::hours(1)),
+								};
+								app_state.blacklist_service.register_token(token_info);
+								debug!("Registered token {} for user {}", token_data.claims.jti, user_id);
+							}
 						}
 
 						// Add user info to request extensions

@@ -18,6 +18,8 @@ pub struct TokenBlacklistService {
 	revoked_tokens: Arc<DashMap<String, TokenInfo>>,
 	// Maps user_id -> Map of JTI -> TokenInfo for active tokens
 	active_tokens: Arc<DashMap<Uuid, DashMap<String, TokenInfo>>>,
+	// Reverse mapping for efficient token lookup
+	jti_to_user: Arc<DashMap<String, Uuid>>,
 }
 
 impl TokenBlacklistService {
@@ -26,21 +28,30 @@ impl TokenBlacklistService {
 		Self {
 			revoked_tokens: Arc::new(DashMap::new()),
 			active_tokens: Arc::new(DashMap::new()),
+			jti_to_user: Arc::new(DashMap::new()),
 		}
 	}
 
-	/// Register a new active token
+	/// Register a new active token (only if not already registered)
 	pub fn register_token(&self, token_info: TokenInfo) {
 		let user_id = token_info.user_id;
 		let jti = token_info.jti.clone();
+
+		if self.jti_to_user.contains_key(&jti) {
+			debug!("Token {} already registered for user {}", jti, user_id);
+			return;
+		}
 
 		// Get or create the user's token map
 		let user_tokens = self.active_tokens.entry(user_id).or_default();
 
 		// Store the full token info (including expiration) for cleanup purposes
-		user_tokens.insert(jti, token_info);
+		user_tokens.insert(jti.clone(), token_info);
 
-		debug!("Registered token {} for user {}", user_tokens.len(), user_id);
+		// Store reverse mapping
+		self.jti_to_user.insert(jti.clone(), user_id);
+
+		debug!("Registered new token {} for user {}", jti, user_id);
 	}
 
 	/// Check if a token is revoked
@@ -49,44 +60,48 @@ impl TokenBlacklistService {
 		self.revoked_tokens.contains_key(jti)
 	}
 
+	/// Check if a token is currently registered (active)
+	#[must_use]
+	pub fn is_token_registered(&self, jti: &str) -> bool {
+		self.jti_to_user.contains_key(jti)
+	}
+
 	/// Revoke a specific token
 	#[must_use]
 	pub fn revoke_token(&self, jti: &str) -> bool {
-		// First, find and remove the token from active tokens
-		let mut token_info = None;
-		let mut user_id_to_check = None;
+		// Use reverse mapping to find the user quickly
+		let user_id = match self.jti_to_user.remove(jti) {
+			Some((_, user_id)) => user_id,
+			None => {
+				warn!("Attempted to revoke unknown token: {}", jti);
+				return false;
+			},
+		};
 
-		// Search through all users' active tokens
-		for user_entry in self.active_tokens.iter() {
-			let user_id = *user_entry.key();
-			let user_tokens = user_entry.value();
-
-			if let Some((_, info)) = user_tokens.remove(jti) {
-				token_info = Some(info);
-				user_id_to_check = Some(user_id);
-				break;
-			}
-		}
+		// Remove from active tokens
+		let token_info = if let Some(user_tokens) = self.active_tokens.get(&user_id) {
+			user_tokens.remove(jti).map(|(_, info)| info)
+		} else {
+			None
+		};
 
 		// If we found the token, add it to revoked list
 		if let Some(mut info) = token_info {
 			// Update the expiration to mark when it was revoked
 			info.expires_at = Utc::now();
-
 			self.revoked_tokens.insert(jti.to_string(), info);
 
 			// Clean up empty user token maps
-			if let Some(user_id) = user_id_to_check
-				&& let Some(user_tokens) = self.active_tokens.get(&user_id)
-				&& user_tokens.is_empty()
-			{
-				self.active_tokens.remove(&user_id);
+			if let Some(user_tokens) = self.active_tokens.get(&user_id) {
+				if user_tokens.is_empty() {
+					self.active_tokens.remove(&user_id);
+				}
 			}
 
 			debug!("Revoked token: {}", jti);
 			true
 		} else {
-			warn!("Attempted to revoke unknown token: {}", jti);
+			warn!("Token {} not found in active tokens for user {}", jti, user_id);
 			false
 		}
 	}
@@ -102,6 +117,8 @@ impl TokenBlacklistService {
 
 			// Move all active tokens to the revoked list
 			for (jti, mut token_info) in user_tokens {
+				self.jti_to_user.remove(&jti);
+
 				token_info.expires_at = now; // Mark as revoked now
 				self.revoked_tokens.insert(jti, token_info);
 				revoked_count += 1;
@@ -116,7 +133,6 @@ impl TokenBlacklistService {
 	}
 
 	/// Comprehensive cleanup of expired tokens
-	/// This should be called periodically to prevent memory leaks
 	pub fn cleanup_expired_tokens(&self) {
 		let now = Utc::now();
 		let mut total_cleaned = 0;
@@ -146,6 +162,7 @@ impl TokenBlacklistService {
 			user_tokens.retain(|jti, token_info| {
 				let should_keep = token_info.expires_at > now;
 				if !should_keep {
+					self.jti_to_user.remove(jti);
 					debug!("Cleaning up expired active token: {} for user: {}", jti, user_id);
 				}
 				should_keep
@@ -228,6 +245,9 @@ impl TokenBlacklistService {
 		// Also remove any revoked tokens for this user
 		self.revoked_tokens
 			.retain(|_, token_info| token_info.user_id != user_id);
+
+		// Remove from reverse mapping
+		self.jti_to_user.retain(|_, mapped_user_id| *mapped_user_id != user_id);
 	}
 
 	/// Get all active token JTIs for a user (useful for testing)
