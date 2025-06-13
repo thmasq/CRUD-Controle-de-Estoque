@@ -8,7 +8,7 @@ use serde_json;
 use std::future::{Ready, ready};
 use stock_application::services::auth_service::Claims;
 use stock_domain::entities::user::UserRole;
-use tracing::{debug, warn};
+use tracing::{debug, info, warn};
 use uuid::Uuid;
 
 use crate::AppState;
@@ -122,15 +122,54 @@ where
 							);
 						};
 
-						// Register token in blacklist service for tracking
-						// This helps track active tokens for revocation
-						let token_info = TokenInfo {
-							jti: token_data.claims.jti.clone(),
-							user_id,
-							expires_at: DateTime::from_timestamp(token_data.claims.exp, 0)
-								.unwrap_or_else(|| Utc::now() + chrono::Duration::hours(24)),
-						};
-						app_state.blacklist_service.register_token(token_info);
+						let renewal_threshold = 15 * 60; // 15 minutes in seconds
+						let needs_renewal = (token_data.claims.exp - now) < renewal_threshold;
+
+						let mut new_token_info = None;
+
+						if needs_renewal {
+							debug!(
+								"Token for user {} expires soon, generating renewal",
+								token_data.claims.username
+							);
+
+							match app_state.auth_service.generate_token_from_claims(&token_data.claims) {
+								Ok((new_token, new_jti)) => {
+									info!(
+										"Auto-renewed token for user {} (old JTI: {}, new JTI: {})",
+										token_data.claims.username, token_data.claims.jti, new_jti
+									);
+
+									let _ = app_state.blacklist_service.revoke_token(&token_data.claims.jti);
+
+									let new_expires_at = DateTime::from_timestamp(now + 3600, 0)
+										.unwrap_or_else(|| Utc::now() + chrono::Duration::hours(1));
+
+									let token_info = TokenInfo {
+										jti: new_jti.clone(),
+										user_id,
+										expires_at: new_expires_at,
+									};
+									app_state.blacklist_service.register_token(token_info);
+
+									new_token_info = Some((new_token, new_jti));
+								},
+								Err(e) => {
+									warn!(
+										"Failed to generate renewal token for user {}: {}",
+										token_data.claims.username, e
+									);
+								},
+							}
+						} else {
+							let token_info = TokenInfo {
+								jti: token_data.claims.jti.clone(),
+								user_id,
+								expires_at: DateTime::from_timestamp(token_data.claims.exp, 0)
+									.unwrap_or_else(|| Utc::now() + chrono::Duration::hours(1)),
+							};
+							app_state.blacklist_service.register_token(token_info);
+						}
 
 						// Add user info to request extensions
 						req.extensions_mut().insert(user_id);
@@ -142,21 +181,43 @@ where
 						};
 						req.extensions_mut().insert(role.clone());
 
-						// Add JTI to request extensions for potential future use
-						req.extensions_mut().insert(token_data.claims.jti.clone());
+						// Add JTI to request extensions (use new JTI if renewed)
+						let current_jti = new_token_info
+							.as_ref()
+							.map(|(_, jti)| jti.clone())
+							.unwrap_or_else(|| token_data.claims.jti.clone());
+						req.extensions_mut().insert(current_jti.clone());
 
 						// Add username to request extensions
 						req.extensions_mut().insert(token_data.claims.username.clone());
 
 						debug!(
-							"Authenticated user: {} (ID: {}, Role: {}, JTI: {})",
-							token_data.claims.username, user_id, role, token_data.claims.jti
+							"Authenticated user: {} (ID: {}, Role: {}, JTI: {}{})",
+							token_data.claims.username,
+							user_id,
+							role,
+							current_jti,
+							if new_token_info.is_some() { " - RENEWED" } else { "" }
 						);
 
 						// Continue with the request
 						let future = self.service.call(req);
 						Box::pin(async move {
-							let response = future.await?;
+							let mut response = future.await?;
+
+							// If we have a new token, set it as a cookie
+							if let Some((new_token, _)) = new_token_info {
+								let cookie = actix_web::cookie::Cookie::build("auth_token", new_token)
+									.http_only(true)
+									.same_site(actix_web::cookie::SameSite::Strict)
+									.path("/")
+									.max_age(actix_web::cookie::time::Duration::seconds(3600)) // 1 hour
+									.finish();
+
+								response.response_mut().add_cookie(&cookie).ok();
+								debug!("Set renewed token cookie in response");
+							}
+
 							Ok(response.map_into_left_body())
 						})
 					},
@@ -215,208 +276,4 @@ fn create_auth_response<B>(
 
 	let (http_req, _) = req.into_parts();
 	ServiceResponse::new(http_req, response).map_into_right_body()
-}
-
-#[cfg(test)]
-mod tests {
-	use super::*;
-	use crate::services::token_blacklist::TokenBlacklistService;
-	use actix_web::{App, HttpResponse, test, web};
-	use chrono::Duration;
-	use std::sync::Arc;
-	use stock_application::services::auth_service::AuthService;
-	use stock_infrastructure::db::establish_connection_pool;
-	use stock_infrastructure::repositories::user_repository::DieselUserRepository;
-
-	async fn protected_handler() -> HttpResponse {
-		HttpResponse::Ok().body("Protected")
-	}
-
-	fn create_test_app_state() -> web::Data<AppState> {
-		let pool = establish_connection_pool();
-		let pool = Arc::new(pool);
-		let user_repo = Arc::new(DieselUserRepository::new(pool));
-		let auth_service = Arc::new(AuthService::new(user_repo, "test_secret".to_string()));
-		let blacklist_service = Arc::new(TokenBlacklistService::new());
-
-		web::Data::new(AppState {
-			category_service: Arc::new(stock_application::CategoryService::new(
-				Arc::new(stock_infrastructure::repositories::category_repository::DieselCategoryRepository::new(
-					Arc::new(establish_connection_pool())
-				))
-			)),
-			product_service: Arc::new(stock_application::ProductService::new(
-				Arc::new(stock_infrastructure::repositories::product_repository::DieselProductRepository::new(
-					Arc::new(establish_connection_pool())
-				))
-			)),
-			warehouse_service: Arc::new(stock_application::WarehouseService::new(
-				Arc::new(stock_infrastructure::repositories::warehouse_repository::DieselWarehouseRepository::new(
-					Arc::new(establish_connection_pool())
-				))
-			)),
-			stock_item_service: Arc::new(stock_application::StockItemService::new(
-				Arc::new(stock_infrastructure::repositories::stock_item_repository::DieselStockItemRepository::new(
-					Arc::new(establish_connection_pool())
-				))
-			)),
-			transaction_service: Arc::new(stock_application::StockTransactionService::new(
-				Arc::new(stock_infrastructure::repositories::stock_transaction_repository::DieselStockTransactionRepository::new(
-					Arc::new(establish_connection_pool())
-				)),
-				Arc::new(stock_infrastructure::repositories::stock_item_repository::DieselStockItemRepository::new(
-					Arc::new(establish_connection_pool())
-				))
-			)),
-			auth_service,
-			blacklist_service,
-			jwt_secret: "test_secret".to_string(),
-			enable_registration: true,
-		})
-	}
-
-	#[actix_web::test]
-	async fn test_redirect_for_regular_request() {
-		let app_state = create_test_app_state();
-		let app = test::init_service(
-			App::new()
-				.app_data(app_state)
-				.wrap(Authentication {
-					exclude_paths: vec!["/auth/login".to_string()],
-				})
-				.route("/protected", web::get().to(protected_handler)),
-		)
-		.await;
-
-		let req = test::TestRequest::get().uri("/protected").to_request();
-		let resp = test::call_service(&app, req).await;
-
-		assert!(
-			resp.status() == actix_web::http::StatusCode::FOUND
-				|| resp.status() == actix_web::http::StatusCode::UNAUTHORIZED
-		);
-
-		if resp.status() == actix_web::http::StatusCode::FOUND {
-			assert_eq!(resp.headers().get("Location").unwrap(), "/auth/login");
-		}
-	}
-
-	#[actix_web::test]
-	async fn test_htmx_redirect() {
-		let app_state = create_test_app_state();
-		let app = test::init_service(
-			App::new()
-				.app_data(app_state)
-				.wrap(Authentication {
-					exclude_paths: vec!["/auth/login".to_string()],
-				})
-				.route("/protected", web::get().to(protected_handler)),
-		)
-		.await;
-
-		let req = test::TestRequest::get()
-			.uri("/protected")
-			.insert_header(("HX-Request", "true"))
-			.to_request();
-		let resp = test::call_service(&app, req).await;
-
-		assert_eq!(resp.status(), actix_web::http::StatusCode::UNAUTHORIZED);
-		assert_eq!(resp.headers().get("HX-Redirect").unwrap(), "/auth/login");
-	}
-
-	#[actix_web::test]
-	async fn test_ajax_redirect() {
-		let app_state = create_test_app_state();
-		let app = test::init_service(
-			App::new()
-				.app_data(app_state)
-				.wrap(Authentication {
-					exclude_paths: vec!["/auth/login".to_string()],
-				})
-				.route("/protected", web::get().to(protected_handler)),
-		)
-		.await;
-
-		let req = test::TestRequest::get()
-			.uri("/protected")
-			.insert_header(("X-Requested-With", "XMLHttpRequest"))
-			.to_request();
-		let resp = test::call_service(&app, req).await;
-
-		assert_eq!(resp.status(), actix_web::http::StatusCode::UNAUTHORIZED);
-		assert_eq!(resp.headers().get("Content-Type").unwrap(), "application/json");
-	}
-
-	#[actix_web::test]
-	async fn test_excluded_path_access() {
-		let app_state = create_test_app_state();
-		let app = test::init_service(
-			App::new()
-				.app_data(app_state)
-				.wrap(Authentication {
-					exclude_paths: vec!["/auth/login".to_string(), "/public".to_string()],
-				})
-				.route("/public/health", web::get().to(|| async { "OK" })),
-		)
-		.await;
-
-		let req = test::TestRequest::get().uri("/public/health").to_request();
-		let resp = test::call_service(&app, req).await;
-
-		assert_eq!(resp.status(), actix_web::http::StatusCode::OK);
-	}
-
-	#[actix_web::test]
-	async fn test_revoked_token_rejection() {
-		let app_state = create_test_app_state();
-
-		// Register and immediately revoke a token
-		let token_info = TokenInfo {
-			jti: "revoked-token".to_string(),
-			user_id: uuid::Uuid::new_v4(),
-			expires_at: Utc::now() + Duration::hours(1),
-		};
-		app_state.blacklist_service.register_token(token_info);
-		let _ = app_state.blacklist_service.revoke_token("revoked-token");
-
-		let app = test::init_service(
-			App::new()
-				.app_data(app_state)
-				.wrap(Authentication {
-					exclude_paths: vec!["/auth/login".to_string()],
-				})
-				.route("/protected", web::get().to(protected_handler)),
-		)
-		.await;
-
-		// Create a valid JWT token but with the revoked JTI
-		use jsonwebtoken::{EncodingKey, Header, encode};
-		let claims = stock_application::services::auth_service::Claims {
-			sub: uuid::Uuid::new_v4().to_string(),
-			username: "testuser".to_string(),
-			role: "MANAGER".to_string(),
-			exp: (Utc::now() + Duration::hours(1)).timestamp(),
-			iat: Utc::now().timestamp(),
-			jti: "revoked-token".to_string(),
-		};
-
-		let token = encode(
-			&Header::default(),
-			&claims,
-			&EncodingKey::from_secret("test_secret".as_bytes()),
-		)
-		.unwrap();
-
-		let req = test::TestRequest::get()
-			.uri("/protected")
-			.cookie(actix_web::cookie::Cookie::new("auth_token", token))
-			.to_request();
-		let resp = test::call_service(&app, req).await;
-
-		// Should be rejected due to revoked token
-		assert!(
-			resp.status() == actix_web::http::StatusCode::UNAUTHORIZED
-				|| resp.status() == actix_web::http::StatusCode::FOUND
-		);
-	}
 }

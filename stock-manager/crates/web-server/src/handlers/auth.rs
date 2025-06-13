@@ -58,21 +58,21 @@ pub async fn login(state: web::Data<AppState>, form: web::Form<LoginDto>) -> Res
 		Ok(token) => {
 			info!("User logged in successfully: {} (ID: {})", form.username, token.user_id);
 
-			// Set JWT token as a cookie
+			// Set JWT token as a cookie with 1-hour expiration to match token lifetime
 			Ok(HttpResponse::Found()
 				.cookie(
 					actix_web::cookie::Cookie::build("auth_token", token.token)
 						.http_only(true)
 						.same_site(actix_web::cookie::SameSite::Strict)
 						.path("/")
-						.max_age(actix_web::cookie::time::Duration::seconds(86400)) // 24 hours
+						.max_age(actix_web::cookie::time::Duration::seconds(3600)) // 1 hour
 						.finish(),
 				)
-				// Add username cookie for UI display
+				// Add username cookie for UI display (also 1 hour)
 				.cookie(
 					actix_web::cookie::Cookie::build("username", form.username.clone())
 						.path("/")
-						.max_age(actix_web::cookie::time::Duration::seconds(86400)) // 24 hours
+						.max_age(actix_web::cookie::time::Duration::seconds(3600)) // 1 hour
 						.finish(),
 				)
 				.append_header(("Location", "/"))
@@ -158,7 +158,8 @@ pub fn token_stats(req: HttpRequest, state: web::Data<AppState>) -> Result<HttpR
 		"total_active_tokens": stats.basic.total_active_tokens,
 		"revoked_tokens": stats.basic.revoked_tokens_count,
 		"expired_active_tokens": stats.expired_active_tokens,
-		"expired_revoked_tokens": stats.expired_revoked_tokens
+		"expired_revoked_tokens": stats.expired_revoked_tokens,
+		"note": "Tokens auto-expire after 1 hour and are auto-renewed when close to expiry"
 	})))
 }
 

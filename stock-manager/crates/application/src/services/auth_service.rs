@@ -94,9 +94,9 @@ impl AuthService {
 		// Generate JWT token with JTI
 		let (token, jti) = self.generate_token(&user)?;
 
-		// Get expiration time (e.g., 24 hours from now)
+		// Get expiration time (1 hour from now)
 		let now = Utc::now();
-		let expiration = now + Duration::hours(24);
+		let expiration = now + Duration::hours(1);
 
 		Ok(AuthTokenDto {
 			token,
@@ -117,9 +117,53 @@ impl AuthService {
 		Ok(token_data)
 	}
 
+	pub async fn refresh_token(&self, user_id: Uuid) -> anyhow::Result<AuthTokenDto> {
+		let user = self
+			.user_repository
+			.find_by_id(user_id)
+			.await?
+			.ok_or_else(|| anyhow::anyhow!("User not found"))?;
+
+		let (token, jti) = self.generate_token(&user)?;
+
+		let now = Utc::now();
+		let expiration = now + Duration::hours(1);
+
+		Ok(AuthTokenDto {
+			token,
+			jti,
+			user_id: user.id,
+			role: user.role,
+			expires_at: expiration.timestamp(),
+		})
+	}
+
+	pub fn generate_token_from_claims(&self, claims: &Claims) -> anyhow::Result<(String, String)> {
+		let now = Utc::now();
+		let expires_at = now + Duration::hours(1);
+		let jti = Uuid::new_v4().to_string();
+
+		let new_claims = Claims {
+			sub: claims.sub.clone(),
+			username: claims.username.clone(),
+			role: claims.role.clone(),
+			exp: expires_at.timestamp(),
+			iat: now.timestamp(),
+			jti: jti.clone(),
+		};
+
+		let token = encode(
+			&Header::default(),
+			&new_claims,
+			&EncodingKey::from_secret(self.jwt_secret.as_bytes()),
+		)?;
+
+		Ok((token, jti))
+	}
+
 	fn generate_token(&self, user: &User) -> anyhow::Result<(String, String)> {
 		let now = Utc::now();
-		let expires_at = now + Duration::hours(24);
+		let expires_at = now + Duration::hours(1);
 		let jti = Uuid::new_v4().to_string();
 
 		let claims = Claims {

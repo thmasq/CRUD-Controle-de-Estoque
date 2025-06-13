@@ -22,6 +22,7 @@ use stock_infrastructure::repositories::stock_item_repository::DieselStockItemRe
 use stock_infrastructure::repositories::stock_transaction_repository::DieselStockTransactionRepository;
 use stock_infrastructure::repositories::warehouse_repository::DieselWarehouseRepository;
 use tokio::pin;
+use uuid::Uuid;
 
 // Application state that holds all services
 pub struct AppState {
@@ -36,9 +37,17 @@ pub struct AppState {
 	pub enable_registration: bool,
 }
 
+fn generate_jwt_secret() -> String {
+	let secret = format!("{}{}", Uuid::new_v4(), Uuid::new_v4());
+	tracing::info!("Generated new JWT secret for this session");
+	secret
+}
+
 #[must_use]
 pub fn create_app_state() -> web::Data<AppState> {
-	let jwt_secret = env::var("JWT_SECRET").unwrap_or_else(|_| "6561df437ac7ad6d26aaabc34dacb267".to_string());
+	let jwt_secret = generate_jwt_secret();
+
+	tracing::info!("JWT secret generated - all previous session tokens are now invalid");
 
 	// Check if registration is enabled (disabled by default)
 	let enable_registration = env::var("ENABLE_REGISTRATION")
