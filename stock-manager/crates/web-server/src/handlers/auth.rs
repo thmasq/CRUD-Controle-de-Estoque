@@ -15,22 +15,19 @@ pub async fn login_form(req: HttpRequest, data: web::Data<AppState>) -> Result<H
 		let token = auth_cookie.value();
 
 		// Verify the token is still valid
-		match decode::<Claims>(
+		if let Ok(token_data) = decode::<Claims>(
 			token,
 			&DecodingKey::from_secret(data.jwt_secret.as_bytes()),
 			&Validation::default(),
 		) {
-			Ok(token_data) => {
-				// Check if token is not expired and not revoked
-				let now = chrono::Utc::now().timestamp();
-				if token_data.claims.exp > now && !data.blacklist_service.is_token_revoked(&token_data.claims.jti) {
-					// User is already authenticated, redirect to dashboard
-					return Ok(HttpResponse::Found().append_header(("Location", "/")).finish());
-				}
-			},
-			Err(_) => {
-				// Invalid token, continue to show login form
-			},
+			// Check if token is not expired and not revoked
+			let now = chrono::Utc::now().timestamp();
+			if token_data.claims.exp > now && !data.blacklist_service.is_token_revoked(&token_data.claims.jti) {
+				// User is already authenticated, redirect to dashboard
+				return Ok(HttpResponse::Found().append_header(("Location", "/")).finish());
+			}
+		} else {
+			// Invalid token, continue to show login form
 		}
 	}
 

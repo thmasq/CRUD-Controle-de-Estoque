@@ -161,20 +161,18 @@ where
 									);
 								},
 							}
-						} else {
-							if !app_state.blacklist_service.is_token_registered(&token_data.claims.jti) {
-								let token_info = TokenInfo {
-									jti: token_data.claims.jti.clone(),
-									user_id,
-									expires_at: DateTime::from_timestamp(token_data.claims.exp, 0)
-										.unwrap_or_else(|| Utc::now() + chrono::Duration::hours(1)),
-								};
-								app_state.blacklist_service.register_token(token_info);
-								debug!(
-									"Re-registered token {} for user {} (recovery)",
-									token_data.claims.jti, user_id
-								);
-							}
+						} else if !app_state.blacklist_service.is_token_registered(&token_data.claims.jti) {
+							let token_info = TokenInfo {
+								jti: token_data.claims.jti.clone(),
+								user_id,
+								expires_at: DateTime::from_timestamp(token_data.claims.exp, 0)
+									.unwrap_or_else(|| Utc::now() + chrono::Duration::hours(1)),
+							};
+							app_state.blacklist_service.register_token(token_info);
+							debug!(
+								"Re-registered token {} for user {} (recovery)",
+								token_data.claims.jti, user_id
+							);
 						}
 
 						// Add user info to request extensions
@@ -190,8 +188,7 @@ where
 						// Add JTI to request extensions (use new JTI if renewed)
 						let current_jti = new_token_info
 							.as_ref()
-							.map(|(_, jti)| jti.clone())
-							.unwrap_or_else(|| token_data.claims.jti.clone());
+							.map_or_else(|| token_data.claims.jti.clone(), |(_, jti)| jti.clone());
 						req.extensions_mut().insert(current_jti.clone());
 
 						// Add username to request extensions

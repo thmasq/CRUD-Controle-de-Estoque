@@ -85,15 +85,12 @@ impl TokenBlacklistService {
 		debug!("Starting revocation process for token {}", jti);
 
 		// Use reverse mapping to find the user quickly
-		let user_id = match self.jti_to_user.remove(jti) {
-			Some((_, user_id)) => {
-				debug!("Found user {} for token {}, removed from reverse mapping", user_id, jti);
-				user_id
-			},
-			None => {
-				debug!("Token {} not found in reverse mapping", jti);
-				return false;
-			},
+		let user_id = if let Some((_, user_id)) = self.jti_to_user.remove(jti) {
+			debug!("Found user {} for token {}, removed from reverse mapping", user_id, jti);
+			user_id
+		} else {
+			debug!("Token {} not found in reverse mapping", jti);
+			return false;
 		};
 
 		// Try to remove from user's active tokens
@@ -130,12 +127,12 @@ impl TokenBlacklistService {
 		debug!("Added token {} to revoked list", jti);
 
 		// Clean up empty user token maps (separate operation to avoid deadlock)
-		if let Some(user_tokens) = self.active_tokens.get(&user_id) {
-			if user_tokens.is_empty() {
-				drop(user_tokens); // Release the reference before removal
-				self.active_tokens.remove(&user_id);
-				debug!("Removed empty token map for user {}", user_id);
-			}
+		if let Some(user_tokens) = self.active_tokens.get(&user_id)
+			&& user_tokens.is_empty()
+		{
+			drop(user_tokens); // Release the reference before removal
+			self.active_tokens.remove(&user_id);
+			debug!("Removed empty token map for user {}", user_id);
 		}
 
 		debug!("Successfully completed revocation for token {}", jti);
