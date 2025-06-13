@@ -32,6 +32,8 @@ impl NotificationListener {
 	}
 
 	pub async fn start(&self) -> anyhow::Result<()> {
+		info!("Starting notification listener...");
+
 		loop {
 			match self.listen_loop().await {
 				Ok(()) => {
@@ -68,7 +70,7 @@ impl NotificationListener {
 				match res {
 					Ok(msg) => {
 						if let Err(send_err) = tx.unbounded_send(msg) {
-							error!("channel send error: {}", send_err);
+							error!("Channel send error: {}", send_err);
 							break;
 						}
 					},
@@ -78,6 +80,7 @@ impl NotificationListener {
 					},
 				}
 			}
+			debug!("Database connection handler terminated");
 		});
 
 		let blacklist_service = self.blacklist_service.clone();
@@ -101,9 +104,12 @@ impl NotificationListener {
 					AsyncMessage::Notice(notice) => {
 						debug!("Received PostgreSQL notice: {}", notice.message());
 					},
-					_ => {},
+					_ => {
+						debug!("Received other PostgreSQL message");
+					},
 				}
 			}
+			debug!("Notification handler terminated");
 		});
 
 		let cleanup_blacklist = self.blacklist_service.clone();
@@ -111,8 +117,20 @@ impl NotificationListener {
 			let mut interval = tokio::time::interval(Duration::from_secs(300));
 			loop {
 				interval.tick().await;
+
+				let stats_before = cleanup_blacklist.get_detailed_stats();
 				cleanup_blacklist.cleanup_expired_tokens();
-				debug!("Cleaned up expired tokens");
+				let stats_after = cleanup_blacklist.get_stats();
+
+				debug!(
+					"Token cleanup completed - Before: {} active, {} revoked ({} expired active, {} expired revoked), After: {} active, {} revoked",
+					stats_before.basic.total_active_tokens,
+					stats_before.basic.revoked_tokens_count,
+					stats_before.expired_active_tokens,
+					stats_before.expired_revoked_tokens,
+					stats_after.total_active_tokens,
+					stats_after.revoked_tokens_count
+				);
 			}
 		});
 
@@ -144,9 +162,11 @@ impl NotificationListener {
 		blacklist_service: &TokenBlacklistService,
 		payload: &str,
 	) -> anyhow::Result<()> {
-		let user_deleted: UserDeletedPayload = serde_json::from_str(payload)?;
+		let user_deleted: UserDeletedPayload = serde_json::from_str(payload)
+			.map_err(|e| anyhow::anyhow!("Failed to parse user_deleted payload: {}", e))?;
 
-		let user_id = Uuid::parse_str(&user_deleted.user_id)?;
+		let user_id =
+			Uuid::parse_str(&user_deleted.user_id).map_err(|e| anyhow::anyhow!("Invalid user_id in payload: {}", e))?;
 
 		info!(
 			"User '{}' (ID: {}) was deleted, revoking all tokens",
@@ -156,14 +176,14 @@ impl NotificationListener {
 		let revoked_count = blacklist_service.revoke_user_tokens(user_id);
 
 		info!(
-			"Revoked {} tokens for deleted user '{}' (ID: {})",
+			"Successfully revoked {} tokens for deleted user '{}' (ID: {})",
 			revoked_count, user_deleted.username, user_id
 		);
 
 		let stats = blacklist_service.get_stats();
 		debug!(
-			"Token blacklist stats - Revoked: {}, Active users: {}, Total active tokens: {}",
-			stats.revoked_tokens_count, stats.active_users_count, stats.total_active_tokens
+			"Token blacklist stats after user deletion - Active users: {}, Total active tokens: {}, Revoked tokens: {}",
+			stats.active_users_count, stats.total_active_tokens, stats.revoked_tokens_count
 		);
 
 		Ok(())
@@ -173,6 +193,8 @@ impl NotificationListener {
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use crate::services::token_blacklist::TokenInfo;
+	use chrono::{Duration, Utc};
 
 	#[tokio::test]
 	async fn test_user_deleted_payload_parsing() {
@@ -188,14 +210,21 @@ mod tests {
 		let blacklist_service = Arc::new(TokenBlacklistService::new());
 		let user_id = Uuid::new_v4();
 
+		// Register some tokens for the user
 		for i in 0..3 {
-			blacklist_service.register_token(super::super::token_blacklist::TokenInfo {
+			blacklist_service.register_token(TokenInfo {
 				jti: format!("token-{}", i),
 				user_id,
-				expires_at: chrono::Utc::now() + chrono::Duration::hours(1),
+				expires_at: Utc::now() + Duration::hours(1),
 			});
 		}
 
+		// Verify tokens are active
+		let stats_before = blacklist_service.get_stats();
+		assert_eq!(stats_before.total_active_tokens, 3);
+		assert_eq!(stats_before.revoked_tokens_count, 0);
+
+		// Simulate user deletion notification
 		let payload = format!(
 			r#"{{"user_id":"{}","username":"testuser","deleted_at":"2024-01-01T12:00:00Z"}}"#,
 			user_id
@@ -205,8 +234,50 @@ mod tests {
 			.await
 			.unwrap();
 
+		// Verify all tokens were revoked
+		let stats_after = blacklist_service.get_stats();
+		assert_eq!(stats_after.total_active_tokens, 0);
+		assert_eq!(stats_after.revoked_tokens_count, 3);
+
+		// Verify individual tokens are marked as revoked
 		for i in 0..3 {
 			assert!(blacklist_service.is_token_revoked(&format!("token-{}", i)));
 		}
+	}
+
+	#[tokio::test]
+	async fn test_handle_invalid_payload() {
+		let blacklist_service = Arc::new(TokenBlacklistService::new());
+
+		// Test with invalid JSON
+		let result = NotificationListener::handle_user_deleted_notification(&blacklist_service, "invalid json").await;
+		assert!(result.is_err());
+		assert!(result.unwrap_err().to_string().contains("Failed to parse"));
+
+		// Test with invalid UUID
+		let payload = r#"{"user_id":"invalid-uuid","username":"testuser","deleted_at":"2024-01-01T12:00:00Z"}"#;
+		let result = NotificationListener::handle_user_deleted_notification(&blacklist_service, payload).await;
+		assert!(result.is_err());
+		assert!(result.unwrap_err().to_string().contains("Invalid user_id"));
+	}
+
+	#[tokio::test]
+	async fn test_user_deleted_notification_with_no_tokens() {
+		let blacklist_service = Arc::new(TokenBlacklistService::new());
+		let user_id = Uuid::new_v4();
+
+		let payload = format!(
+			r#"{{"user_id":"{}","username":"testuser","deleted_at":"2024-01-01T12:00:00Z"}}"#,
+			user_id
+		);
+
+		// Should not fail even if user has no tokens
+		let result = NotificationListener::handle_user_deleted_notification(&blacklist_service, &payload).await;
+		assert!(result.is_ok());
+
+		// Should report 0 tokens revoked
+		let stats = blacklist_service.get_stats();
+		assert_eq!(stats.total_active_tokens, 0);
+		assert_eq!(stats.revoked_tokens_count, 0);
 	}
 }
