@@ -1,11 +1,13 @@
 use actix_web::{HttpMessage, HttpRequest, HttpResponse, Result, web};
 use askama::DynTemplate;
+use chrono::{DateTime, Utc};
 use jsonwebtoken::{DecodingKey, Validation, decode};
 use stock_application::services::auth_service::{Claims, Credentials};
 use tracing::{debug, info, warn};
 
 use crate::AppState;
 use crate::dtos::auth::{LoginDto, LoginTemplate, RegisterDto, RegisterTemplate};
+use crate::services::token_blacklist::TokenInfo;
 
 pub async fn login_form(req: HttpRequest, data: web::Data<AppState>) -> Result<HttpResponse> {
 	// Check if user is already authenticated
@@ -82,6 +84,15 @@ pub async fn login(state: web::Data<AppState>, form: web::Form<LoginDto>) -> Res
 		Ok(token) => {
 			info!("User logged in successfully: {} (ID: {})", form.username, token.user_id);
 
+			let token_info = TokenInfo {
+				jti: token.jti.clone(),
+				user_id: token.user_id,
+				expires_at: DateTime::from_timestamp(token.expires_at, 0)
+					.unwrap_or_else(|| Utc::now() + chrono::Duration::hours(1)),
+			};
+			state.blacklist_service.register_token(token_info);
+			debug!("Registered token {} for user {} at login", token.jti, token.user_id);
+
 			// Set JWT token as a cookie with 1-hour expiration to match token lifetime
 			Ok(HttpResponse::Found()
 				.cookie(
@@ -135,7 +146,10 @@ pub async fn logout(req: HttpRequest, state: web::Data<AppState>) -> Result<Http
 				if state.blacklist_service.revoke_token(jti) {
 					info!("Token revoked successfully for user '{}' (JTI: {})", username, jti);
 				} else {
-					warn!("Failed to revoke token for user '{}' (JTI: {})", username, jti);
+					debug!(
+						"Token {} for user '{}' was not found in blacklist (may have been already revoked or not yet registered)",
+						jti, username
+					);
 				}
 
 				debug!("User '{}' logged out", username);

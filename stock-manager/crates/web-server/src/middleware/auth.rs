@@ -170,7 +170,10 @@ where
 										.unwrap_or_else(|| Utc::now() + chrono::Duration::hours(1)),
 								};
 								app_state.blacklist_service.register_token(token_info);
-								debug!("Registered token {} for user {}", token_data.claims.jti, user_id);
+								debug!(
+									"Re-registered token {} for user {} (recovery)",
+									token_data.claims.jti, user_id
+								);
 							}
 						}
 
