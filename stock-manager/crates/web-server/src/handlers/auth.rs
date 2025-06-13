@@ -1,9 +1,11 @@
 use actix_web::{HttpResponse, Result, web};
 use askama::DynTemplate;
+use chrono::{DateTime, Utc};
 use stock_application::services::auth_service::Credentials;
 
 use crate::AppState;
 use crate::dtos::auth::{LoginDto, LoginTemplate, RegisterDto, RegisterTemplate};
+use crate::services::token_blacklist::TokenInfo;
 
 pub async fn login_form(data: web::Data<AppState>) -> Result<HttpResponse> {
 	let template = LoginTemplate {
@@ -48,6 +50,13 @@ pub async fn login(state: web::Data<AppState>, form: web::Form<LoginDto>) -> Res
 
 	match auth_service.login(credentials).await {
 		Ok(token) => {
+			let token_info = TokenInfo {
+				jti: token.jti.clone(),
+				user_id: token.user_id,
+				expires_at: DateTime::from_timestamp(token.expires_at, 0).unwrap_or_else(Utc::now),
+			};
+			state.blacklist_service.register_token(token_info);
+
 			// Set JWT token as a cookie
 			Ok(HttpResponse::Found()
 				.cookie(
