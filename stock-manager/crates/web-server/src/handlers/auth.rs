@@ -293,43 +293,37 @@ mod tests {
 	use stock_application::services::auth_service::{AuthService, RegisterUserDto};
 	use stock_domain::entities::user::UserRole;
 	use stock_infrastructure::db::establish_connection_pool;
+	use stock_infrastructure::repositories::category_repository::DieselCategoryRepository;
+	use stock_infrastructure::repositories::product_repository::DieselProductRepository;
+	use stock_infrastructure::repositories::stock_item_repository::DieselStockItemRepository;
+	use stock_infrastructure::repositories::stock_transaction_repository::DieselStockTransactionRepository;
 	use stock_infrastructure::repositories::user_repository::DieselUserRepository;
+	use stock_infrastructure::repositories::warehouse_repository::DieselWarehouseRepository;
 
 	fn create_test_app_state() -> web::Data<AppState> {
-		let pool = establish_connection_pool();
-		let pool = Arc::new(pool);
-		let user_repo = Arc::new(DieselUserRepository::new(pool));
+		// Create a single shared connection pool for all repositories
+		let pool = Arc::new(establish_connection_pool());
+
+		// Create repositories using the shared pool
+		let user_repo = Arc::new(DieselUserRepository::new(pool.clone()));
+		let category_repo = Arc::new(DieselCategoryRepository::new(pool.clone()));
+		let product_repo = Arc::new(DieselProductRepository::new(pool.clone()));
+		let warehouse_repo = Arc::new(DieselWarehouseRepository::new(pool.clone()));
+		let stock_item_repo = Arc::new(DieselStockItemRepository::new(pool.clone()));
+		let transaction_repo = Arc::new(DieselStockTransactionRepository::new(pool));
+
+		// Create services
 		let auth_service = Arc::new(AuthService::new(user_repo, "test_secret".to_string()));
 		let blacklist_service = Arc::new(TokenBlacklistService::new());
 
 		web::Data::new(AppState {
-			category_service: Arc::new(stock_application::CategoryService::new(
-				Arc::new(stock_infrastructure::repositories::category_repository::DieselCategoryRepository::new(
-					Arc::new(establish_connection_pool())
-				))
-			)),
-			product_service: Arc::new(stock_application::ProductService::new(
-				Arc::new(stock_infrastructure::repositories::product_repository::DieselProductRepository::new(
-					Arc::new(establish_connection_pool())
-				))
-			)),
-			warehouse_service: Arc::new(stock_application::WarehouseService::new(
-				Arc::new(stock_infrastructure::repositories::warehouse_repository::DieselWarehouseRepository::new(
-					Arc::new(establish_connection_pool())
-				))
-			)),
-			stock_item_service: Arc::new(stock_application::StockItemService::new(
-				Arc::new(stock_infrastructure::repositories::stock_item_repository::DieselStockItemRepository::new(
-					Arc::new(establish_connection_pool())
-				))
-			)),
+			category_service: Arc::new(stock_application::CategoryService::new(category_repo)),
+			product_service: Arc::new(stock_application::ProductService::new(product_repo)),
+			warehouse_service: Arc::new(stock_application::WarehouseService::new(warehouse_repo)),
+			stock_item_service: Arc::new(stock_application::StockItemService::new(stock_item_repo.clone())),
 			transaction_service: Arc::new(stock_application::StockTransactionService::new(
-				Arc::new(stock_infrastructure::repositories::stock_transaction_repository::DieselStockTransactionRepository::new(
-					Arc::new(establish_connection_pool())
-				)),
-				Arc::new(stock_infrastructure::repositories::stock_item_repository::DieselStockItemRepository::new(
-					Arc::new(establish_connection_pool())
-				))
+				transaction_repo,
+				stock_item_repo,
 			)),
 			auth_service,
 			blacklist_service,
@@ -367,9 +361,12 @@ mod tests {
 	async fn test_successful_login_logout_flow() {
 		let app_state = create_test_app_state();
 
+		// Create a unique username for this test to avoid conflicts
+		let username = format!("testuser_{}", uuid::Uuid::new_v4().simple());
+
 		// First register a user
 		let register_dto = RegisterUserDto {
-			username: "testuser".to_string(),
+			username: username.clone(),
 			password: "testpass".to_string(),
 			role: UserRole::Manager,
 		};
@@ -378,7 +375,7 @@ mod tests {
 
 		// Then login
 		let login_form = web::Form(LoginDto {
-			username: "testuser".to_string(),
+			username: username.clone(),
 			password: "testpass".to_string(),
 		});
 

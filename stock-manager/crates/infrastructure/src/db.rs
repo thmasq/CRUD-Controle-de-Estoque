@@ -9,8 +9,11 @@ pub type PgPooledConnection = PooledConnection<ConnectionManager<PgConnection>>;
 pub fn establish_connection_pool() -> PgPool {
 	let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
 	let manager = ConnectionManager::<PgConnection>::new(database_url);
+
+	let max_size = if cfg!(test) { 2 } else { 15 };
+
 	Pool::builder()
-		.max_size(15)
+		.max_size(max_size)
 		.test_on_check_out(true)
 		.build(manager)
 		.expect("Failed to create connection pool")

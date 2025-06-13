@@ -97,7 +97,7 @@ jobs:
           "
 
       - name: Run unit tests
-        run: cargo +nightly test --manifest-path stock-manager/Cargo.toml --lib -- --test-threads=1
+        run: cargo +nightly test --manifest-path stock-manager/Cargo.toml --lib
         env:
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/stockmanager_test
 
