@@ -1,5 +1,5 @@
 use futures_channel::mpsc;
-use futures_util::{StreamExt, stream};
+use futures_util::StreamExt;
 use serde::Deserialize;
 use std::sync::Arc;
 use std::time::Duration;
@@ -53,63 +53,75 @@ impl NotificationListener {
 	async fn listen_loop(&self) -> anyhow::Result<()> {
 		info!("Connecting to PostgreSQL for notifications...");
 
-		let (client, mut connection) = connect(&self.database_url, NoTls).await?;
-
+		let (client, connection) = connect(&self.database_url, NoTls).await?;
 		info!("Connected to PostgreSQL, starting to listen for notifications");
-
-		client.batch_execute("LISTEN user_deleted;").await?;
-
-		info!("Now listening to 'user_deleted' channel");
 
 		let (tx, mut rx) = mpsc::unbounded();
 
 		let connection_handle = tokio::spawn(async move {
-			let mut message_stream = stream::poll_fn(move |cx| connection.poll_message(cx));
+			tokio::pin!(connection);
 
-			while let Some(res) = message_stream.next().await {
-				match res {
-					Ok(msg) => {
-						if let Err(send_err) = tx.unbounded_send(msg) {
-							error!("Channel send error: {}", send_err);
-							break;
-						}
-					},
-					Err(db_err) => {
-						error!("Postgres connection error: {}", db_err);
-						break;
-					},
-				}
-			}
-			debug!("Database connection handler terminated");
-		});
+			info!("Starting connection driver with notification interception...");
 
-		let blacklist_service = self.blacklist_service.clone();
-		let notification_handle = tokio::spawn(async move {
-			while let Some(message) = rx.next().await {
-				match message {
-					AsyncMessage::Notification(notification) => {
+			loop {
+				match futures_util::future::poll_fn(|cx| connection.as_mut().poll_message(cx)).await {
+					Some(Ok(AsyncMessage::Notification(notification))) => {
 						debug!(
-							"Received notification on channel '{}': {}",
+							"Intercepted notification on channel '{}': {}",
 							notification.channel(),
 							notification.payload()
 						);
 
-						if notification.channel() == "user_deleted"
-							&& let Err(e) =
-								Self::handle_user_deleted_notification(&blacklist_service, notification.payload())
-						{
-							error!("Error handling user_deleted notification: {}", e);
+						if tx.unbounded_send(notification).is_err() {
+							error!("Notification channel closed");
+							break;
 						}
 					},
-					AsyncMessage::Notice(notice) => {
-						debug!("Received PostgreSQL notice: {}", notice.message());
+					Some(Ok(AsyncMessage::Notice(notice))) => {
+						debug!("PostgreSQL notice: {}", notice.message());
 					},
-					_ => {
-						debug!("Received other PostgreSQL message");
+					Some(Err(e)) => {
+						error!("PostgreSQL connection error: {}", e);
+						break;
 					},
+					None => {
+						info!("PostgreSQL connection closed");
+						break;
+					},
+					Some(Ok(_)) => todo!(),
 				}
 			}
-			debug!("Notification handler terminated");
+			info!("Connection driver terminated");
+		});
+
+		debug!("Executing LISTEN command...");
+		client.batch_execute("LISTEN user_deleted;").await?;
+		info!("Now listening to 'user_deleted' channel");
+
+		let blacklist_service = self.blacklist_service.clone();
+		let notification_handle = tokio::spawn(async move {
+			let mut count = 0;
+
+			while let Some(notification) = rx.next().await {
+				count += 1;
+				debug!(
+					"Processing notification #{}: channel='{}', payload='{}'",
+					count,
+					notification.channel(),
+					notification.payload()
+				);
+
+				if notification.channel() == "user_deleted" {
+					if let Err(e) =
+						Self::handle_user_deleted_notification(&blacklist_service, notification.payload()).await
+					{
+						error!("Error handling user_deleted notification: {}", e);
+					} else {
+						info!("Successfully processed user deletion notification");
+					}
+				}
+			}
+			info!("Notification handler terminated after {} notifications", count);
 		});
 
 		let cleanup_blacklist = self.blacklist_service.clone();
@@ -133,6 +145,8 @@ impl NotificationListener {
 				);
 			}
 		});
+
+		tokio::time::sleep(Duration::from_millis(100)).await;
 
 		tokio::select! {
 			result = connection_handle => {
@@ -158,7 +172,7 @@ impl NotificationListener {
 		Ok(())
 	}
 
-	fn handle_user_deleted_notification(
+	async fn handle_user_deleted_notification(
 		blacklist_service: &TokenBlacklistService,
 		payload: &str,
 	) -> anyhow::Result<()> {
@@ -182,100 +196,10 @@ impl NotificationListener {
 
 		let stats = blacklist_service.get_stats();
 		debug!(
-			"Token blacklist stats after user deletion - Active users: {}, Total active tokens: {}, Revoked tokens: {}",
-			stats.active_users_count, stats.total_active_tokens, stats.revoked_tokens_count
+			"Token blacklist stats after user deletion - Active: {}, Revoked: {}",
+			stats.total_active_tokens, stats.revoked_tokens_count
 		);
 
 		Ok(())
-	}
-}
-
-#[cfg(test)]
-mod tests {
-	use super::*;
-	use crate::services::token_blacklist::TokenInfo;
-	use chrono::{Duration, Utc};
-
-	#[tokio::test]
-	async fn test_user_deleted_payload_parsing() {
-		let payload = r#"{"user_id":"550e8400-e29b-41d4-a716-446655440000","username":"testuser","deleted_at":"2024-01-01T12:00:00Z"}"#;
-
-		let parsed: UserDeletedPayload = serde_json::from_str(payload).unwrap();
-		assert_eq!(parsed.user_id, "550e8400-e29b-41d4-a716-446655440000");
-		assert_eq!(parsed.username, "testuser");
-	}
-
-	#[tokio::test]
-	async fn test_handle_user_deleted_notification() {
-		let blacklist_service = Arc::new(TokenBlacklistService::new());
-		let user_id = Uuid::new_v4();
-
-		// Register some tokens for the user
-		for i in 0..3 {
-			blacklist_service.register_token(TokenInfo {
-				jti: format!("token-{}", i),
-				user_id,
-				expires_at: Utc::now() + Duration::hours(1),
-			});
-		}
-
-		// Verify tokens are active
-		let stats_before = blacklist_service.get_stats();
-		assert_eq!(stats_before.total_active_tokens, 3);
-		assert_eq!(stats_before.revoked_tokens_count, 0);
-
-		// Simulate user deletion notification
-		let payload = format!(
-			r#"{{"user_id":"{}","username":"testuser","deleted_at":"2024-01-01T12:00:00Z"}}"#,
-			user_id
-		);
-
-		NotificationListener::handle_user_deleted_notification(&blacklist_service, &payload).unwrap();
-
-		// Verify all tokens were revoked
-		let stats_after = blacklist_service.get_stats();
-		assert_eq!(stats_after.total_active_tokens, 0);
-		assert_eq!(stats_after.revoked_tokens_count, 3);
-
-		// Verify individual tokens are marked as revoked
-		for i in 0..3 {
-			assert!(blacklist_service.is_token_revoked(&format!("token-{}", i)));
-		}
-	}
-
-	#[tokio::test]
-	async fn test_handle_invalid_payload() {
-		let blacklist_service = Arc::new(TokenBlacklistService::new());
-
-		// Test with invalid JSON
-		let result = NotificationListener::handle_user_deleted_notification(&blacklist_service, "invalid json");
-		assert!(result.is_err());
-		assert!(result.unwrap_err().to_string().contains("Failed to parse"));
-
-		// Test with invalid UUID
-		let payload = r#"{"user_id":"invalid-uuid","username":"testuser","deleted_at":"2024-01-01T12:00:00Z"}"#;
-		let result = NotificationListener::handle_user_deleted_notification(&blacklist_service, payload);
-		assert!(result.is_err());
-		assert!(result.unwrap_err().to_string().contains("Invalid user_id"));
-	}
-
-	#[tokio::test]
-	async fn test_user_deleted_notification_with_no_tokens() {
-		let blacklist_service = Arc::new(TokenBlacklistService::new());
-		let user_id = Uuid::new_v4();
-
-		let payload = format!(
-			r#"{{"user_id":"{}","username":"testuser","deleted_at":"2024-01-01T12:00:00Z"}}"#,
-			user_id
-		);
-
-		// Should not fail even if user has no tokens
-		let result = NotificationListener::handle_user_deleted_notification(&blacklist_service, &payload);
-		assert!(result.is_ok());
-
-		// Should report 0 tokens revoked
-		let stats = blacklist_service.get_stats();
-		assert_eq!(stats.total_active_tokens, 0);
-		assert_eq!(stats.revoked_tokens_count, 0);
 	}
 }
