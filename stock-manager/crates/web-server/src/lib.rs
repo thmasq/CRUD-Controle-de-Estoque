@@ -211,6 +211,7 @@ pub async fn run_server() -> std::io::Result<()> {
 				exclude_paths: vec![
 					"/auth/login".to_string(),
 					"/auth/register".to_string(),
+					"/auth/logout".to_string(),
 					"/_static".to_string(),
 				],
 			})
