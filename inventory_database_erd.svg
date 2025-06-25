@@ -1,0 +1,155 @@
+<svg viewBox="0 0 1400 1000" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .table-header { fill: #2563eb; font-family: Arial, sans-serif; font-size: 14px; font-weight: bold; }
+      .table-bg { fill: #3b82f6; stroke: #1e40af; stroke-width: 2; }
+      .column-bg { fill: #f8fafc; stroke: #e2e8f0; stroke-width: 1; }
+      .column-text { fill: #334155; font-family: Arial, sans-serif; font-size: 11px; }
+      .pk { fill: #dc2626; font-weight: bold; }
+      .fk { fill: #7c3aed; font-weight: bold; }
+      .relationship-line { stroke: #64748b; stroke-width: 2; fill: none; }
+      .relationship-text { fill: #475569; font-family: Arial, sans-serif; font-size: 10px; }
+    </style>
+  </defs>
+  
+  <!-- Categories Table -->
+  <g id="categories">
+    <rect class="table-bg" x="50" y="50" width="280" height="30"/>
+    <text class="table-header" x="190" y="70" text-anchor="middle">CATEGORIES</text>
+    <rect class="column-bg" x="50" y="80" width="280" height="140"/>
+    <text class="column-text pk" x="60" y="100">🔑 id: UUID (PK)</text>
+    <text class="column-text" x="60" y="120">name: VARCHAR(100) NOT NULL UNIQUE</text>
+    <text class="column-text" x="60" y="140">description: TEXT</text>
+    <text class="column-text" x="60" y="160">created_at: TIMESTAMPTZ NOT NULL</text>
+    <text class="column-text" x="60" y="180">updated_at: TIMESTAMPTZ NOT NULL</text>
+    <text class="column-text" x="60" y="200">DEFAULT NOW()</text>
+  </g>
+  
+  <!-- Products Table -->
+  <g id="products">
+    <rect class="table-bg" x="450" y="50" width="320" height="30"/>
+    <text class="table-header" x="610" y="70" text-anchor="middle">PRODUCTS</text>
+    <rect class="column-bg" x="450" y="80" width="320" height="180"/>
+    <text class="column-text pk" x="460" y="100">🔑 id: UUID (PK)</text>
+    <text class="column-text" x="460" y="120">name: VARCHAR(255) NOT NULL</text>
+    <text class="column-text" x="460" y="140">description: TEXT</text>
+    <text class="column-text" x="460" y="160">sku: VARCHAR(50) NOT NULL UNIQUE</text>
+    <text class="column-text fk" x="460" y="180">🔗 category_id: UUID (FK)</text>
+    <text class="column-text" x="460" y="200">is_active: BOOLEAN NOT NULL DEFAULT TRUE</text>
+    <text class="column-text" x="460" y="220">created_at: TIMESTAMPTZ NOT NULL</text>
+    <text class="column-text" x="460" y="240">updated_at: TIMESTAMPTZ NOT NULL</text>
+  </g>
+  
+  <!-- Warehouses Table -->
+  <g id="warehouses">
+    <rect class="table-bg" x="50" y="300" width="280" height="30"/>
+    <text class="table-header" x="190" y="320" text-anchor="middle">WAREHOUSES</text>
+    <rect class="column-bg" x="50" y="330" width="280" height="180"/>
+    <text class="column-text pk" x="60" y="350">🔑 id: UUID (PK)</text>
+    <text class="column-text" x="60" y="370">name: VARCHAR(100) NOT NULL UNIQUE</text>
+    <text class="column-text" x="60" y="390">location: TEXT NOT NULL</text>
+    <text class="column-text" x="60" y="410">contact_info: TEXT</text>
+    <text class="column-text" x="60" y="430">is_active: BOOLEAN NOT NULL DEFAULT TRUE</text>
+    <text class="column-text" x="60" y="450">created_at: TIMESTAMPTZ NOT NULL</text>
+    <text class="column-text" x="60" y="470">updated_at: TIMESTAMPTZ NOT NULL</text>
+    <text class="column-text" x="60" y="490">DEFAULT NOW()</text>
+  </g>
+  
+  <!-- Stock Items Table -->
+  <g id="stock_items">
+    <rect class="table-bg" x="450" y="320" width="350" height="30"/>
+    <text class="table-header" x="625" y="340" text-anchor="middle">STOCK_ITEMS</text>
+    <rect class="column-bg" x="450" y="350" width="350" height="220"/>
+    <text class="column-text pk" x="460" y="370">🔑 id: UUID (PK)</text>
+    <text class="column-text fk" x="460" y="390">🔗 product_id: UUID (FK) NOT NULL</text>
+    <text class="column-text fk" x="460" y="410">🔗 warehouse_id: UUID (FK) NOT NULL</text>
+    <text class="column-text" x="460" y="430">quantity: INTEGER NOT NULL CHECK (≥ 0)</text>
+    <text class="column-text" x="460" y="450">unit_cost: NUMERIC(10,2) NOT NULL CHECK (≥ 0)</text>
+    <text class="column-text" x="460" y="470">last_restocked: TIMESTAMPTZ NOT NULL</text>
+    <text class="column-text" x="460" y="490">created_at: TIMESTAMPTZ NOT NULL</text>
+    <text class="column-text" x="460" y="510">updated_at: TIMESTAMPTZ NOT NULL</text>
+    <text class="column-text" x="460" y="530">is_active: BOOLEAN NOT NULL DEFAULT TRUE</text>
+    <text class="column-text" x="460" y="550">UNIQUE (product_id, warehouse_id)</text>
+  </g>
+  
+  <!-- Stock Transactions Table -->
+  <g id="stock_transactions">
+    <rect class="table-bg" x="900" y="320" width="380" height="30"/>
+    <text class="table-header" x="1090" y="340" text-anchor="middle">STOCK_TRANSACTIONS</text>
+    <rect class="column-bg" x="900" y="350" width="380" height="220"/>
+    <text class="column-text pk" x="910" y="370">🔑 id: UUID (PK)</text>
+    <text class="column-text fk" x="910" y="390">🔗 stock_item_id: UUID (FK) NOT NULL</text>
+    <text class="column-text" x="910" y="410">quantity: INTEGER NOT NULL</text>
+    <text class="column-text" x="910" y="430">transaction_type: VARCHAR(20) NOT NULL</text>
+    <text class="column-text" x="910" y="450">CHECK (IN 'IN', 'OUT', 'ADJUSTMENT')</text>
+    <text class="column-text" x="910" y="470">reference_number: VARCHAR(100)</text>
+    <text class="column-text" x="910" y="490">notes: TEXT</text>
+    <text class="column-text" x="910" y="510">created_at: TIMESTAMPTZ NOT NULL</text>
+    <text class="column-text" x="910" y="530">created_by: VARCHAR(100) NOT NULL</text>
+    <text class="column-text" x="910" y="550">DEFAULT NOW()</text>
+  </g>
+  
+  <!-- Users Table -->
+  <g id="users">
+    <rect class="table-bg" x="50" y="600" width="280" height="30"/>
+    <text class="table-header" x="190" y="620" text-anchor="middle">USERS</text>
+    <rect class="column-bg" x="50" y="630" width="280" height="160"/>
+    <text class="column-text pk" x="60" y="650">🔑 id: UUID (PK)</text>
+    <text class="column-text" x="60" y="670">username: VARCHAR(100) NOT NULL UNIQUE</text>
+    <text class="column-text" x="60" y="690">password_hash: VARCHAR(255) NOT NULL</text>
+    <text class="column-text" x="60" y="710">role: VARCHAR(20) NOT NULL</text>
+    <text class="column-text" x="60" y="730">DEFAULT 'SELLER'</text>
+    <text class="column-text" x="60" y="750">created_at: TIMESTAMPTZ NOT NULL</text>
+    <text class="column-text" x="60" y="770">updated_at: TIMESTAMPTZ NOT NULL</text>
+  </g>
+  
+  <!-- Relationships -->
+  
+  <!-- Categories to Products (1:M) -->
+  <line class="relationship-line" x1="330" y1="150" x2="450" y2="180"/>
+  <circle cx="330" cy="150" r="3" fill="#64748b"/>
+  <text class="relationship-text" x="350" y="145">1</text>
+  <text class="relationship-text" x="420" y="175">M</text>
+  <text class="relationship-text" x="380" y="160">has</text>
+  
+  <!-- Products to Stock Items (1:M) -->
+  <line class="relationship-line" x1="610" y1="260" x2="575" y2="320"/>
+  <circle cx="610" cy="260" r="3" fill="#64748b"/>
+  <text class="relationship-text" x="615" y="275">1</text>
+  <text class="relationship-text" x="580" y="315">M</text>
+  <text class="relationship-text" x="590" y="290">stored in</text>
+  
+  <!-- Warehouses to Stock Items (1:M) -->
+  <line class="relationship-line" x1="330" y1="410" x2="450" y2="410"/>
+  <circle cx="330" cy="410" r="3" fill="#64748b"/>
+  <text class="relationship-text" x="340" y="405">1</text>
+  <text class="relationship-text" x="430" y="405">M</text>
+  <text class="relationship-text" x="380" y="425">contains</text>
+  
+  <!-- Stock Items to Stock Transactions (1:M) -->
+  <line class="relationship-line" x1="800" y1="450" x2="900" y2="450"/>
+  <circle cx="800" cy="450" r="3" fill="#64748b"/>
+  <text class="relationship-text" x="810" y="445">1</text>
+  <text class="relationship-text" x="880" y="445">M</text>
+  <text class="relationship-text" x="840" y="440">tracks</text>
+  
+  <!-- Legend -->
+  <g id="legend">
+    <rect x="900" y="50" width="300" height="150" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1"/>
+    <text x="1050" y="70" text-anchor="middle" class="table-header">LEGEND</text>
+    <text x="910" y="90" class="column-text pk">🔑 Primary Key (PK)</text>
+    <text x="910" y="110" class="column-text fk">🔗 Foreign Key (FK)</text>
+    <text x="910" y="130" class="column-text">● NOT NULL constraint</text>
+    <text x="910" y="150" class="column-text">◦ UNIQUE constraint</text>
+    <text x="910" y="170" class="column-text">△ CHECK constraint</text>
+    <text x="910" y="190" class="column-text">1:M One-to-Many relationship</text>
+  </g>
+  
+  <!-- Database Info -->
+  <text x="700" y="950" text-anchor="middle" fill="#475569" font-family="Arial, sans-serif" font-size="14" font-weight="bold">
+    Inventory Management System Database Schema
+  </text>
+  <text x="700" y="970" text-anchor="middle" fill="#64748b" font-family="Arial, sans-serif" font-size="12">
+    PostgreSQL with UUID Primary Keys, Timestamps, and Business Logic Constraints
+  </text>
+</svg>
