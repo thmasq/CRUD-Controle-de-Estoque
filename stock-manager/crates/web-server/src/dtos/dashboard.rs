@@ -28,7 +28,9 @@ pub struct TransactionChartData {
 pub struct TransactionDataset {
 	pub label: String,
 	pub data: Vec<u32>,
+	#[serde(rename = "borderColor")]
 	pub border_color: String,
+	#[serde(rename = "backgroundColor")]
 	pub background_color: String,
 	pub tension: f32,
 }
@@ -37,5 +39,6 @@ pub struct TransactionDataset {
 pub struct WarehouseChartData {
 	pub labels: Vec<String>,
 	pub data: Vec<u32>,
+	#[serde(rename = "backgroundColor")]
 	pub background_colors: Vec<String>,
 }

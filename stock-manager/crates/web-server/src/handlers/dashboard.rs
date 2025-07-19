@@ -182,6 +182,12 @@ fn prepare_warehouse_chart_data(
 		}
 	}
 
+	if warehouse_totals.is_empty() {
+		for warehouse in warehouse_map.values() {
+			warehouse_totals.insert(warehouse.name.clone(), 0);
+		}
+	}
+
 	// Sort warehouses by stock quantity (descending)
 	let mut sorted_warehouses: Vec<_> = warehouse_totals.into_iter().collect();
 	sorted_warehouses.sort_by(|a, b| b.1.cmp(&a.1));

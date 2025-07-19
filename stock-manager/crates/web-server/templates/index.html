@@ -168,45 +168,54 @@ document.addEventListener('DOMContentLoaded', function() {
     const warehouseCtx = document.getElementById('warehouseChart').getContext('2d');
     const warehouseData = {{ warehouse_chart_json | safe }};
     
-    new Chart(warehouseCtx, {
-        type: 'doughnut',
-        data: {
-            labels: warehouseData.labels,
-            datasets: [{
-                data: warehouseData.data,
-                backgroundColor: warehouseData.background_colors,
-                borderWidth: 2,
-                borderColor: '#ffffff',
-                hoverBorderWidth: 3,
-                hoverBorderColor: '#ffffff'
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'bottom',
-                    labels: {
-                        padding: 20,
-                        usePointStyle: true
-                    }
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            const label = context.label || '';
-                            const value = context.parsed;
-                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                            const percentage = ((value / total) * 100).toFixed(1);
-                            return `${label}: ${value} items (${percentage}%)`;
+    if (warehouseData.labels.length === 0) {
+        const canvas = document.getElementById('warehouseChart');
+        const container = canvas.parentElement;
+        container.innerHTML = '<div class="flex items-center justify-center h-64 text-gray-500"><p>No warehouse data available</p></div>';
+    } else {
+        new Chart(warehouseCtx, {
+            type: 'doughnut',
+            data: {
+                labels: warehouseData.labels,
+                datasets: [{
+                    data: warehouseData.data,
+                    backgroundColor: warehouseData.backgroundColor,
+                    borderWidth: 2,
+                    borderColor: '#ffffff',
+                    hoverBorderWidth: 3,
+                    hoverBorderColor: '#ffffff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            padding: 20,
+                            usePointStyle: true
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.label || '';
+                                const value = context.parsed;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                if (total === 0) {
+                                    return `${label}: 0 items`;
+                                }
+                                const percentage = ((value / total) * 100).toFixed(1);
+                                return `${label}: ${value} items (${percentage}%)`;
+                            }
                         }
                     }
-                }
-            },
-            cutout: '60%'
-        }
-    });
+                },
+                cutout: '60%'
+            }
+        });
+    }
 });
 </script>
 {% endblock %}
