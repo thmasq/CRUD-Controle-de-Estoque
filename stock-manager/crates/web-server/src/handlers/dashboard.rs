@@ -1,8 +1,10 @@
 use actix_web::{HttpResponse, Result, web};
 use askama::DynTemplate;
+use chrono::{Duration, Utc};
+use std::collections::HashMap;
 
 use crate::AppState;
-use crate::dtos::dashboard::DashboardTemplate;
+use crate::dtos::dashboard::{DashboardTemplate, TransactionChartData, TransactionDataset, WarehouseChartData};
 
 pub async fn index(state: web::Data<AppState>) -> Result<HttpResponse> {
 	// Create services
@@ -69,6 +71,12 @@ pub async fn index(state: web::Data<AppState>) -> Result<HttpResponse> {
 		}
 	}
 
+	// Prepare transaction chart data (last 14 days)
+	let transaction_chart_data = prepare_transaction_chart_data(&transactions);
+
+	// Prepare warehouse chart data
+	let warehouse_chart_data = prepare_warehouse_chart_data(&stock_items, &warehouse_map);
+
 	// Create template
 	let template = DashboardTemplate {
 		product_count: products.len() as u64,
@@ -77,9 +85,124 @@ pub async fn index(state: web::Data<AppState>) -> Result<HttpResponse> {
 		stock_item_count: stock_items.len() as u64,
 		recent_transactions,
 		low_stock_items,
+		transaction_chart_data,
+		warehouse_chart_data,
 	};
 
 	Ok(HttpResponse::Ok()
 		.content_type("text/html")
 		.body(template.dyn_render().unwrap()))
+}
+
+fn prepare_transaction_chart_data(
+	transactions: &[stock_domain::entities::stock_transaction::StockTransaction],
+) -> TransactionChartData {
+	let now = Utc::now();
+	let start_date = now - Duration::days(13); // Last 14 days
+
+	// Generate labels for the last 14 days
+	let mut labels = Vec::new();
+	let mut date_to_index = HashMap::new();
+
+	for i in 0..14 {
+		let date = (start_date + Duration::days(i)).date_naive();
+		let label = date.format("%m/%d").to_string();
+		labels.push(label);
+		date_to_index.insert(date, i as usize);
+	}
+
+	// Initialize data arrays
+	let mut in_data = vec![0u32; 14];
+	let mut out_data = vec![0u32; 14];
+	let mut adjustment_data = vec![0u32; 14];
+
+	// Group transactions by date and type
+	for transaction in transactions {
+		let transaction_date = transaction.created_at.date_naive();
+
+		if let Some(&index) = date_to_index.get(&transaction_date) {
+			match transaction.transaction_type {
+				stock_domain::entities::stock_transaction::TransactionType::In => {
+					in_data[index] += transaction.quantity.unsigned_abs();
+				},
+				stock_domain::entities::stock_transaction::TransactionType::Out => {
+					out_data[index] += transaction.quantity.unsigned_abs();
+				},
+				stock_domain::entities::stock_transaction::TransactionType::Adjustment => {
+					adjustment_data[index] += transaction.quantity.unsigned_abs();
+				},
+			}
+		}
+	}
+
+	let datasets = vec![
+		TransactionDataset {
+			label: "Stock In".to_string(),
+			data: in_data,
+			border_color: "rgb(34, 197, 94)".to_string(),
+			background_color: "rgba(34, 197, 94, 0.1)".to_string(),
+			tension: 0.3,
+		},
+		TransactionDataset {
+			label: "Stock Out".to_string(),
+			data: out_data,
+			border_color: "rgb(239, 68, 68)".to_string(),
+			background_color: "rgba(239, 68, 68, 0.1)".to_string(),
+			tension: 0.3,
+		},
+		TransactionDataset {
+			label: "Adjustments".to_string(),
+			data: adjustment_data,
+			border_color: "rgb(168, 85, 247)".to_string(),
+			background_color: "rgba(168, 85, 247, 0.1)".to_string(),
+			tension: 0.3,
+		},
+	];
+
+	TransactionChartData { labels, datasets }
+}
+
+fn prepare_warehouse_chart_data(
+	stock_items: &[stock_domain::entities::stock_item::StockItem],
+	warehouse_map: &HashMap<uuid::Uuid, stock_domain::entities::warehouse::Warehouse>,
+) -> WarehouseChartData {
+	let mut warehouse_totals: HashMap<String, u32> = HashMap::new();
+
+	// Sum up stock quantities by warehouse
+	for item in stock_items {
+		if let Some(warehouse) = warehouse_map.get(&item.warehouse_id) {
+			*warehouse_totals.entry(warehouse.name.clone()).or_insert(0) += item.quantity as u32;
+		}
+	}
+
+	// Sort warehouses by stock quantity (descending)
+	let mut sorted_warehouses: Vec<_> = warehouse_totals.into_iter().collect();
+	sorted_warehouses.sort_by(|a, b| b.1.cmp(&a.1));
+
+	let labels: Vec<String> = sorted_warehouses.iter().map(|(name, _)| name.clone()).collect();
+	let data: Vec<u32> = sorted_warehouses.iter().map(|(_, quantity)| *quantity).collect();
+
+	// Generate colors for warehouses
+	let colors = vec![
+		"rgba(59, 130, 246, 0.8)".to_string(), // Blue
+		"rgba(34, 197, 94, 0.8)".to_string(),  // Green
+		"rgba(239, 68, 68, 0.8)".to_string(),  // Red
+		"rgba(168, 85, 247, 0.8)".to_string(), // Purple
+		"rgba(245, 158, 11, 0.8)".to_string(), // Amber
+		"rgba(236, 72, 153, 0.8)".to_string(), // Pink
+		"rgba(20, 184, 166, 0.8)".to_string(), // Teal
+		"rgba(99, 102, 241, 0.8)".to_string(), // Indigo
+	];
+
+	let background_colors = labels
+		.iter()
+		.enumerate()
+		.map(|(i, _)| colors.get(i % colors.len()).unwrap_or(&colors[0]).clone())
+		.collect();
+
+	WarehouseChartData {
+		labels,
+		data,
+		background_colors,
+	}
 }

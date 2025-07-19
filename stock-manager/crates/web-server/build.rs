@@ -7,6 +7,10 @@ fn main() {
 	let files = [
 		("https://unpkg.com/htmx.org@2.0.4", "htmx.min.js"),
 		("https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4", "tailwind.min.js"),
+		(
+			"https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js",
+			"chart.min.js",
+		),
 	];
 
 	let static_dir = Path::new("static");

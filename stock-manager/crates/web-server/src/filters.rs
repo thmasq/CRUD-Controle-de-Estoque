@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use rust_decimal::Decimal;
+use serde::Serialize;
 use uuid::Uuid;
 
 #[allow(clippy::unnecessary_wraps)]
@@ -54,4 +55,9 @@ pub fn option_uuid_eq(option_id: &Option<Uuid>, _: &dyn askama::Values, uuid: &U
 #[allow(clippy::unnecessary_wraps)]
 pub fn format_decimal(value: &Decimal, _: &dyn askama::Values) -> askama::Result<String> {
 	Ok(format!("{value:.2}"))
+}
+
+#[allow(clippy::unnecessary_wraps)]
+pub fn json<T: Serialize>(value: &T, _: &dyn askama::Values) -> askama::Result<String> {
+	serde_json::to_string(value).map_err(|e| askama::Error::Custom(Box::new(e)))
 }
