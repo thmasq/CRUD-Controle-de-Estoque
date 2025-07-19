@@ -125,7 +125,7 @@
 document.addEventListener('DOMContentLoaded', function() {
     // Transaction Chart
     const transactionCtx = document.getElementById('transactionChart').getContext('2d');
-    const transactionData = {{ transaction_chart_data | json }};
+    const transactionData = {{ transaction_chart_json | safe }};
     
     new Chart(transactionCtx, {
         type: 'line',
@@ -166,7 +166,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Warehouse Chart
     const warehouseCtx = document.getElementById('warehouseChart').getContext('2d');
-    const warehouseData = {{ warehouse_chart_data | json }};
+    const warehouseData = {{ warehouse_chart_json | safe }};
     
     new Chart(warehouseCtx, {
         type: 'doughnut',

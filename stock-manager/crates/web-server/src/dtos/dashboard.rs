@@ -14,8 +14,8 @@ pub struct DashboardTemplate {
 	pub stock_item_count: u64,
 	pub recent_transactions: Vec<TransactionDto>,
 	pub low_stock_items: Vec<StockItemDto>,
-	pub transaction_chart_data: TransactionChartData,
-	pub warehouse_chart_data: WarehouseChartData,
+	pub transaction_chart_json: String,
+	pub warehouse_chart_json: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

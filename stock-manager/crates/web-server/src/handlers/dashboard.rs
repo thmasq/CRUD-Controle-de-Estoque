@@ -77,6 +77,13 @@ pub async fn index(state: web::Data<AppState>) -> Result<HttpResponse> {
 	// Prepare warehouse chart data
 	let warehouse_chart_data = prepare_warehouse_chart_data(&stock_items, &warehouse_map);
 
+	// Serialize chart data to JSON strings
+	let transaction_chart_json =
+		serde_json::to_string(&transaction_chart_data).unwrap_or_else(|_| r#"{"labels":[],"datasets":[]}"#.to_string());
+
+	let warehouse_chart_json = serde_json::to_string(&warehouse_chart_data)
+		.unwrap_or_else(|_| r#"{"labels":[],"data":[],"background_colors":[]}"#.to_string());
+
 	// Create template
 	let template = DashboardTemplate {
 		product_count: products.len() as u64,
@@ -85,8 +92,8 @@ pub async fn index(state: web::Data<AppState>) -> Result<HttpResponse> {
 		stock_item_count: stock_items.len() as u64,
 		recent_transactions,
 		low_stock_items,
-		transaction_chart_data,
-		warehouse_chart_data,
+		transaction_chart_json,
+		warehouse_chart_json,
 	};
 
 	Ok(HttpResponse::Ok()
