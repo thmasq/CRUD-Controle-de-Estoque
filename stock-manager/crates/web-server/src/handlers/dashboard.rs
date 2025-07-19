@@ -183,7 +183,7 @@ fn prepare_warehouse_chart_data(
 	let data: Vec<u32> = sorted_warehouses.iter().map(|(_, quantity)| *quantity).collect();
 
 	// Generate colors for warehouses
-	let colors = vec![
+	let colors = [
 		"rgba(59, 130, 246, 0.8)".to_string(), // Blue
 		"rgba(34, 197, 94, 0.8)".to_string(),  // Green
 		"rgba(239, 68, 68, 0.8)".to_string(),  // Red
@@ -191,7 +191,7 @@ fn prepare_warehouse_chart_data(
 		"rgba(245, 158, 11, 0.8)".to_string(), // Amber
 		"rgba(236, 72, 153, 0.8)".to_string(), // Pink
 		"rgba(20, 184, 166, 0.8)".to_string(), // Teal
-		"rgba(99, 102, 241, 0.8)".to_string(), // Indigo
+		"rgba(99, 102, 241, 0.8)".to_string(),
 	];
 
 	let background_colors = labels
